@@ -20,7 +20,7 @@ public class Chess4DBoard : MonoBehaviour
     public GameObject BasisOrigin;
 
     private float xy_offset = 0.0825f;
-    private float z_offset = 0.1235f;
+    private float z_offset = 0.1235f * 1.33333333f;
     private float z_scaling = 0.9f;
     private float w_offset = 0.4125f;
     private float t_offset = 1.0f;
@@ -31,6 +31,10 @@ public class Chess4DBoard : MonoBehaviour
     Vector3 up = new Vector3(0, 1, 0);
     Vector3 fw = new Vector3(0, 0, 1);
 
+    public bool has_target = false;
+    public int target_piece = 0;
+
+    public float move_speed = 0.1f;
 
     public Chess4DEvaluator evaluator;
 
@@ -39,25 +43,166 @@ public class Chess4DBoard : MonoBehaviour
         return (int[])squares.Clone();
     }
 
+    public void MakeMove(int from, int to)
+    {
+        squares[to] = squares[from];
+        squares[from] = 0;
+
+        SetPiecesFromSquares();
+        if (has_target)
+        {
+            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
+            old_target.transform.position = PosFromIndex(target_piece);
+        }
+        target_piece = to;
+        has_target = true;
+        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
+        square.transform.position = PosFromIndex(from);
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (has_target)
+        {
+            GameObject square = squares_root.transform.GetChild(target_piece).gameObject; ;
+            Vector3 new_pos = Vector3.MoveTowards(square.transform.position, PosFromIndex(target_piece), move_speed * (Time.deltaTime));
+            //if (Vector3.Distance(square.transform.position, new_pos) < 0.01f)
+            //{
+            //    has_target = false;
+            //}
+            square.transform.position = new_pos;
+        }
+    }
+
     int[] start_state = new int[256] {
                                         5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
                                         3, 1, 2, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
                                         3, 2, 6, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  6, 0, 1, 0,
+                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
                                         6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
                                         6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
                                         6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 6, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 12,12,12,12,
+                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
                                         0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 6, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
                                         0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11,
-                                        0, 0, 0, 0,  0, 0, 1, 0, 12,12,12,12,  9, 7, 8, 9,
-                                        0, 0, 0, 0,  0, 0, 0, 6, 12,12,12,12,  9, 8,12, 9,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 7, 8, 9,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 8,12, 9,
                                         0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11
                                       };
 
+
+    
+
+    int[] test_state0_transposed = new int[256] {
+
+
+
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        
+                                        6, 0, 0, 0,  8, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 12,
+                                        6, 0, 0, 0,  0, 0, 6, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 0, 0, 0,  0, 0, 0, 6,  0, 0, 0, 0,  0, 0, 0, 12
+
+        
+                                        //       w ----->
+                                        //       y ->
+                                        // z  x 
+                                        // |  | 
+                                        // |  v 
+                                        // |
+                                        // | 
+                                        // v
+                                      };
+
+    void set_test_state_transpose()
+    {
+        int[] new_state = (int[])test_state0_transposed.Clone();
+        for (int i = 0; i < new_state.Length; i++)
+        {
+            TransposeInverse(test_state0_transposed, new_state, i);
+        }
+        SetPieces(new_state);
+    }
+
+    int[] Transpose(int[] state, int index)
+    {
+        int[] new_state = (int[])state.Clone();
+
+        int x = ( index >> 0 ) & 3;
+        int y = ( index >> 2 ) & 3;
+        int z = ( index >> 4 ) & 3;
+        int w = ( index >> 6 ) & 3;
+
+        int x0 = y;
+        int y0 = w;
+        int z0 = x;
+        int w0 = z;
+
+        int index1 = ( ((x & 3) << 0 ) +
+                       ((y & 3) << 2 ) +
+                       ((z & 3) << 4 ) +
+                       ((w & 3) << 6 ) ) ;
+
+        int index0 = ( ((x0 & 3) << 0 ) +
+                       ((y0 & 3) << 2 ) +
+                       ((z0 & 3) << 4 ) +
+                       ((w0 & 3) << 6 ) ) ;
+
+        new_state[index0] = state[index1];
+
+        return new_state;
+    }
+    int[] TransposeInverse(int[] state_old, int[] state_new, int index)
+    {
+        int[] new_state = state_new;
+
+        //int x0 = y;
+        //int y0 = w;
+        //int z0 = x;
+        //int w0 = z;
+
+        int x = (index >> 0) & 3;
+        int y = (index >> 2) & 3;
+        int z = (index >> 4) & 3;
+        int w = (index >> 6) & 3;
+
+        int x0 = z;
+        int y0 = x;
+        int z0 = w;
+        int w0 = y;
+
+        int index1 = (((x & 3) << 0) +
+                       ((y & 3) << 2) +
+                       ((z & 3) << 4) +
+                       ((w & 3) << 6));
+
+        int index0 = (((x0 & 3) << 0) +
+                       ((y0 & 3) << 2) +
+                       ((z0 & 3) << 4) +
+                       ((w0 & 3) << 6));
+
+        new_state[index0] = state_old[index1];
+
+        return new_state;
+    }
 
     void FillReferenceMeshes(GameObject ReferenceRoot, int start, int length)
     {
@@ -90,7 +235,7 @@ public class Chess4DBoard : MonoBehaviour
         }
     }
 
-    public void SetPieces(int[] state)
+    private void SetPieces(int[] state)
     {
         squares = (int[])state.Clone();
         SetPiecesFromSquares();
@@ -101,6 +246,7 @@ public class Chess4DBoard : MonoBehaviour
         for (int i = 0; i < squares.Length; i++)
         {
             GameObject square = squares_root.transform.GetChild(i).gameObject;
+            square.transform.position = PosFromIndex(i);
 
             MeshFilter mesh_filter = square.GetComponent<MeshFilter>();
             MeshRenderer mesh_renderer = square.GetComponent<MeshRenderer>();
@@ -133,6 +279,8 @@ public class Chess4DBoard : MonoBehaviour
         FindAndSetSquaresRoot();
         UpdateBasis();
         InitializeSquares();
+
+        //set_test_state_transpose();
         SetPiecesFromSquares();
     }
 
@@ -147,11 +295,6 @@ public class Chess4DBoard : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
 
 
 
@@ -229,7 +372,7 @@ public class Chess4DBoard : MonoBehaviour
 
             // Scale our offsets by its global scale
             xy_offset = 0.0825f * t.lossyScale.z;
-            z_offset = 0.1235f * t.lossyScale.z;
+            z_offset = 0.1235f * t.lossyScale.z * 1.33333333f;
             z_scaling = 0.9f;
             w_offset = 0.4125f * t.lossyScale.z;
             t_offset = 1.0f * t.lossyScale.z;
