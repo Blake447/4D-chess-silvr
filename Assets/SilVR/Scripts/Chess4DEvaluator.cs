@@ -141,35 +141,35 @@ public class Chess4DEvaluator : MonoBehaviour
 
 
     // Adding and clearing methods for the move buffer. Stores possible moves as encoded values (not node adresses)
-    public void AddMoveToBuffer(int move)
+    private void AddMoveToBuffer(int move)
     {
         move_buffer[move_count] = move;
         move_count++;
     }
-    public void ClearMoveBuffer()
+    private void ClearMoveBuffer()
     {
         move_count = 0;
     }
 
     // Adding and clearing methods for the good moves array. Stores the move as enocded values (not node adresses)
-    public void AddToGoodMoves(int good_move)
+    private void AddToGoodMoves(int good_move)
     {
         good_moves[good_moves_count] = good_move;
         good_moves_count++;
     }
-    public void ClearGoodMoves()
+    private void ClearGoodMoves()
     {
         good_moves_count = 0;
     }
 
     // Adding and clearing methods for the casting array. Add is deprecated since we just assign by index in a loop
-    void AddToCast(int square)
+    private void AddToCast(int square)
     {
         cast_results[cast_count] = square;
         cast_count++;
     }
 
-    void ClearCast()
+    private void ClearCast()
     {
         cast_count = 0;
     }
@@ -179,20 +179,20 @@ public class Chess4DEvaluator : MonoBehaviour
     // in which we evaluate pieces, in case future changes want to optimize for alpha-beta pruning.
 
     // It should be noted this change is prospective and requires serious tree structure changes to make any meaningful difference
-    public int GetPieceRefFromPieceBuffer(int index)
+    private int GetPieceRefFromPieceBuffer(int index)
     {
         return pieces_to_move[index];
     }
-    public void SetPieceRefToPieceBuffer(int index, int piece_reference)
+    private void SetPieceRefToPieceBuffer(int index, int piece_reference)
     {
         pieces_to_move[index] = piece_reference;
     }
-    public void AddPieceRefToPieceBuffer(int piece_reference)
+    private void AddPieceRefToPieceBuffer(int piece_reference)
     {
         pieces_to_move[pieces_count] = piece_reference;
         pieces_count++;
     }
-    public void ClearPieceRefsFromPieceBuffer()
+    private void ClearPieceRefsFromPieceBuffer()
     {
         pieces_count = 0;
     }
@@ -204,7 +204,7 @@ public class Chess4DEvaluator : MonoBehaviour
     ///                                     ///
     ///////////////////////////////////////////
 
-    void OnMoveFound()
+    private void OnMoveFound()
     {
         int move_found = move_chosen_buffer;
         if (move_found != 0)
@@ -221,7 +221,7 @@ public class Chess4DEvaluator : MonoBehaviour
         //SearchForMove();
     }
 
-    void OnInitialization()
+    private void OnInitialization()
     {
         //SearchForMove();
     }
@@ -237,7 +237,7 @@ public class Chess4DEvaluator : MonoBehaviour
         StartSearchForMove();
     }
 
-    void MakeMoveOnBoard(Chess4DBoard board, int move)
+    public void MakeMoveOnBoard(Chess4DBoard board, int move)
     {
         // Revert the board state to the boards actual state (cloning the array and discarding the current one)
         LoadBoardState(board);
@@ -325,7 +325,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Begin the Tree Construction. TODO: Put the tree freeing logic into the start of this
-    public void StartTreeConstruction(bool isWhite)
+    private void StartTreeConstruction(bool isWhite)
     {
         // Only do something if not already busy to avoid memory leakage
         if (!isClearingTree && !isAdvancing)
@@ -352,7 +352,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Add an empty node as the root node to the move tree.
-    public void AddNullRoot(int[] tree_root_pointer)
+    private void AddNullRoot(int[] tree_root_pointer)
     {
         int address = GetFreeMemoryAddress();
         tree_root_pointer[0] = address;
@@ -370,7 +370,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Advance the tree construction if we are able to. Doesnt repeat main logic if called multiple times a frame after failing
-    public void AdvanceTreeConstruction()
+    private void AdvanceTreeConstruction()
     {
         if (isAdvancing)
         {
@@ -546,7 +546,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Fill the buffer with piece references that the current evaluating player can hypothetically mvoe
-    public void FillPieceBuffer(int[] board_state, bool isBlack)
+    private void FillPieceBuffer(int[] board_state, bool isBlack)
     {
         // Clear the piece buffer
         ClearPieceRefsFromPieceBuffer();
@@ -562,7 +562,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Add a child node to the move tree with the specified move and value, managing all of its new pointers
-    public void AddChildToMoveTree(int parent_address, int move, int value)
+    private void AddChildToMoveTree(int parent_address, int move, int value)
     {
         // If we are adding the node to a valid parent node
         if (parent_address != NULL)
@@ -657,7 +657,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Final cleanup process after ending the tree construction
-    public void EndTreeConstruction()
+    private void EndTreeConstruction()
     {
         // Search the 1st level of the tree (after the empty root node) for immediately possible moves of minimax'd scores.
         // Loads all moves that tie in score into an array as to randomly pick one out.
@@ -674,7 +674,7 @@ public class Chess4DEvaluator : MonoBehaviour
 
 
     // Iterate through the immediately possible moves to determine the best one based on a minimax
-    public void FillGoodMoves(int tree_head, bool isMinning)
+    private void FillGoodMoves(int tree_head, bool isMinning)
     {
         // Reset the good move buffer in which we'll store moves
         ClearGoodMoves();
@@ -844,7 +844,7 @@ public class Chess4DEvaluator : MonoBehaviour
     ///          Piece Searching            ///
     ///                                     ///
     ///////////////////////////////////////////
-    
+
     // Methods used for finding various pieces on the board state
 
 
@@ -852,7 +852,7 @@ public class Chess4DEvaluator : MonoBehaviour
     // Takes in starting coordinate, and the index of the forward and lateral direction in which to cast in.
     // Stores casting result in the array cast_results, and takes in the current board state to cast within.
     // Stores NULL as the casting result if it starts going out of bounds
-    void CastForPiece(int x, int y, int z, int w, int lateral, int forward, int[] cast_results, int[] state)
+    private void CastForPiece(int x, int y, int z, int w, int lateral, int forward, int[] cast_results, int[] state)
     {
         int px = x;
         int py = y;
@@ -899,7 +899,7 @@ public class Chess4DEvaluator : MonoBehaviour
     ///      Evaluator initialization       ///
     ///                                     ///
     ///////////////////////////////////////////
-    
+
     // idk man, it initializes the evaluator
 
 
@@ -965,14 +965,14 @@ public class Chess4DEvaluator : MonoBehaviour
     ///    Simulated Memory manipulation    ///
     ///                                     ///
     ///////////////////////////////////////////
-    
+
     // This program is simulating several memory blocks with integer arrays. The main memory block
     // is move_array, but its paired with several others for some pretty extreme struct-like instancing
 
 
 
     // Initialize our simulated memory
-    void InitializeMemory()
+    private void InitializeMemory()
     {
         for (int i = 0; i < SYSTEM_VMEM - 1; i++)
         {
@@ -981,7 +981,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Get the and return next free memory address
-    int GetFreeMemoryAddress()
+    private int GetFreeMemoryAddress()
     {
         int old_head = memory_stack_head[0];
         int new_head = memory_stack_next[old_head];
@@ -996,7 +996,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Free the specified memory address. No I'm not implementing a garbage collector
-    void FreeMemoryAddress(int address)
+    private void FreeMemoryAddress(int address)
     {
         if (address != NULL)
         {
@@ -1026,7 +1026,7 @@ public class Chess4DEvaluator : MonoBehaviour
 
 
     // Applies an encoded motion to a specified board state, effectively executing the motion
-    void ApplyEncodedMovement(int[] state, int encoded_movment)
+    private void ApplyEncodedMovement(int[] state, int encoded_movment)
     {
         int from = decode_from(encoded_movment);
         int to = decode_to(encoded_movment);
@@ -1036,7 +1036,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Reverts an encoded motion to a specified board state. Requires captured pieces to be encoded into the move
-    void RevertEncodedMovement(int[] state, int encoded_movment)
+    private void RevertEncodedMovement(int[] state, int encoded_movment)
     {
         int from = decode_from(encoded_movment);
         int to = decode_to(encoded_movment);
@@ -1047,7 +1047,7 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // load the board state from a specified chess board into the global board state
-    void LoadBoardState(Chess4DBoard board)
+    private void LoadBoardState(Chess4DBoard board)
     {
         board_state = board.GetSquareArray();
     }
@@ -1065,31 +1065,31 @@ public class Chess4DEvaluator : MonoBehaviour
 
     // Encodes info about moves into an integer for easier storage and manipulation
     // first 8 bits are starting square, next 8 are target square, and after that is the piece it captured (including 0 = empty)
-    int encode_movement(int from, int to, int piece_captured)
+    public int encode_movement(int from, int to, int piece_captured)
     {
         return ((from & 255) << 0) + ((to & 255) << 8) + ((piece_captured & 255) << 16);
     }
 
     // extract and return the bits in which the starting square of a movement are encoded into
-    int decode_from(int movement)
+    public int decode_from(int movement)
     {
         return ((movement >> 0) & 255);
     }
 
     // extract and return the bits in which the landing square of a movement are encoded into
-    int decode_to(int movement)
+    public int decode_to(int movement)
     {
         return ((movement >> 8) & 255);
     }
 
     // extract and return the bits in which the captured piece of a movement are encoded into
-    int decode_captured(int movement)
+    public int decode_captured(int movement)
     {
         return ((movement >> 16) & 255);
     }
 
     // take the piece type in, and output a string corresponding to its name.
-    string GetPieceString(int piece)
+    public string GetPieceString(int piece)
     {
         int piece_type = PieceTypeColorless(piece);
         if (piece_type == 1)
@@ -1134,26 +1134,26 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Make a coordinate into a nice string to output
-    string CalculateCoordinateString(int x, int y, int z, int w)
+    private string CalculateCoordinateString(int x, int y, int z, int w)
     {
         return "( " + x + ", " + y + ", " + z + ", " + w + " )";
     }
 
     // Determines if a pieces is black without checking for empties
-    bool isBlackPiece(int piece_id)
+    public bool isBlackPiece(int piece_id)
     {
         return (piece_id < 7);
     }
 
     // Gets the piece type, stripping out color info. Refer to whatever documentation I end up coming up with
-    int PieceTypeColorless(int piece_type)
+    public int PieceTypeColorless(int piece_type)
     {
         if (piece_type == 0) { return 0; }
         return ((piece_type - 1) % 6) + 1;
     }
 
     // Gets the piece color as an integer, either 0 or 1.
-    int PieceColor(int piece_type)
+    public int PieceColor(int piece_type)
     {
         if (isBlackPiece(piece_type))
         {
@@ -1192,7 +1192,7 @@ public class Chess4DEvaluator : MonoBehaviour
 
     // The worst function in this code. Fills the move buffer based on the pieces in the supplied state.
     // Mostly just copy pasted together without worrying about abstraction or code base.
-    void FillMoveBuffer(int[] state, int square)
+    private void FillMoveBuffer(int[] state, int square)
     {
         //pieces_count = 0;
 
