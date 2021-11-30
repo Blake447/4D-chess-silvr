@@ -1,6 +1,12 @@
 ﻿using UnityEngine;
-
+#if UDON
+using UdonSharp;
+using VRC.SDKBase;
+using VRC.Udon;
+public class Chess4DBoard : UdonSharpBehaviour
+#else
 public class Chess4DBoard : MonoBehaviour
+#endif
 {
     int[] squares = new int[256];
     GameObject squares_root;
@@ -37,6 +43,17 @@ public class Chess4DBoard : MonoBehaviour
     public float move_speed = 0.1f;
 
     public Chess4DEvaluator evaluator;
+
+    public void ResetBoard()
+    {
+        if (has_target)
+        {
+            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
+            old_target.transform.position = PosFromIndex(target_piece);
+        }
+        InitializeSquares();
+        SetPiecesFromSquares();
+    }
 
     public int[] GetSquareArray()
     {
@@ -229,7 +246,16 @@ public class Chess4DBoard : MonoBehaviour
         for (int i = 0; i < squares.Length; i++)
         {
             Vector3 position = PosFromIndex(i);
+
+#if UDON
+            //GameObject square_instance = VRCInstantiate(SquareTemplate), position, Quaternion.identity);
+            GameObject square_instance = VRCInstantiate(SquareTemplate);
+            square_instance.transform.position = position;
+            square_instance.transform.rotation = Quaternion.identity;
+#else
             GameObject square_instance = Instantiate(SquareTemplate, position, Quaternion.identity);
+#endif
+
             square_instance.transform.parent = squares_root.transform;
             square_instance.name = "Square" + (i / 100 % 10).ToString() + (i / 10 % 10).ToString() + (i % 10).ToString(); 
         }

@@ -1,8 +1,14 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
+﻿using UnityEngine;
+using System.Collections;
+using System;
+#if UDON
+using UdonSharp;
+using VRC.SDKBase;
+using VRC.Udon;
+public class Chess4DEvaluator : UdonSharpBehaviour
+#else
 public class Chess4DEvaluator : MonoBehaviour
+#endif
 {
     ///////////////////////////////////////////
     ///        External References          ///
@@ -84,7 +90,6 @@ public class Chess4DEvaluator : MonoBehaviour
     int[] good_moves;
     int good_moves_count = 0;
 
-
     ///////////////////////////////////////////
     ///         AI State Variables          ///
     ///////////////////////////////////////////
@@ -99,28 +104,36 @@ public class Chess4DEvaluator : MonoBehaviour
     // advancing and clearing flags
     bool isAdvancing = false;
     bool isClearingTree = false;
+    bool isBusy = false;
 
     int move_chosen_buffer = 0;
+
+    //public float time_spent_filling_pieces = 0;
+    //public float time_spent_filling_moves = 0;
+    //public float time_spent_evaluating_nodes = 0;
+    //public float time_spent_freeing_children = 0;
+
 
     ///////////////////////////////////////////
     ///      Constant Look-Up Tables        ///
     ///////////////////////////////////////////
 
-    int[] laterals_x = new int[4] { 1, -1, 0,  0 };
-    int[] laterals_y = new int[4] { 0,  0, 0,  0 };
-    int[] laterals_z = new int[4] { 0,  0, 1, -1 };
-    int[] laterals_w = new int[4] { 0,  0, 0,  0 };
 
-    int[] forwards_x = new int[4] { 0,  0, 0,  0 };
-    int[] forwards_y = new int[4] { 1, -1, 0,  0 };
-    int[] forwards_z = new int[4] { 0,  0, 0,  0 };
-    int[] forwards_w = new int[4] { 0,  0, 1, -1 };
+    int[] laterals_x = new int[4] { 1, -1, 0, 0 };
+    int[] laterals_y = new int[4] { 0, 0, 0, 0 };
+    int[] laterals_z = new int[4] { 0, 0, 1, -1 };
+    int[] laterals_w = new int[4] { 0, 0, 0, 0 };
+
+    int[] forwards_x = new int[4] { 0, 0, 0, 0 };
+    int[] forwards_y = new int[4] { 1, -1, 0, 0 };
+    int[] forwards_z = new int[4] { 0, 0, 0, 0 };
+    int[] forwards_w = new int[4] { 0, 0, 1, -1 };
+
 
     int[] point_table = new int[13]
     {
         0, -100001, -50, -30, -10, -40, -5, 100000, 50, 30, 10, 40, 5
     };
-
 
     ///////////////////////////////////////////
     ///                                     ///
@@ -137,7 +150,7 @@ public class Chess4DEvaluator : MonoBehaviour
     // to "clear" out a buffer, there's no need to actually clear data, we just need to set the count to 0.
 
     // note this means all piece count variables global references
-    
+
 
 
     // Adding and clearing methods for the move buffer. Stores possible moves as encoded values (not node adresses)
@@ -168,7 +181,6 @@ public class Chess4DEvaluator : MonoBehaviour
         cast_results[cast_count] = square;
         cast_count++;
     }
-
     private void ClearCast()
     {
         cast_count = 0;
@@ -219,6 +231,7 @@ public class Chess4DEvaluator : MonoBehaviour
         // Logic to make AI play itself
         isPlayingWhite = !isPlayingWhite;
         //SearchForMove();
+        isBusy = false;
     }
 
     private void OnInitialization()
@@ -231,6 +244,11 @@ public class Chess4DEvaluator : MonoBehaviour
     ///      Misc. High Level Methods       ///
     ///                                     ///
     ///////////////////////////////////////////
+
+    public bool IsEvaluatorBusy()
+    {
+        return isBusy;
+    }
 
     public void SearchForMove()
     {
@@ -299,6 +317,7 @@ public class Chess4DEvaluator : MonoBehaviour
     {
         if (!isClearingTree && !isAdvancing)
         {
+            isBusy = true;
             StartTreeConstruction(isPlayingWhite);
         }
     }
@@ -410,7 +429,9 @@ public class Chess4DEvaluator : MonoBehaviour
                 // Assume that we dont have any pieces set up, and do a piece search.
                 int color_parity = current_depth & 1;
                 bool isSearchingWhite = (color_parity == 0) == isStartingBlack;
+
                 FillPieceBuffer(state_ref, isSearchingWhite);
+
             }
             // If we havent evaluated any moves yet and have more pieces, then fill the move buffer with our current pieces moves. Note that if it cant find any
             // pieces, it will simply skip over this step, leaving the move_count at 0.
@@ -485,7 +506,7 @@ public class Chess4DEvaluator : MonoBehaviour
                         int parent_value = value_array[sentinal];
 
                         // Since we just moved up into this node, all its children have been added. Since this is the case, we'll evaluate the children.
-                        int child_value = EvaluateChildren(sentinal, isMinning, current_depth, isPlayingWhite, isWhite, parent_value, state_ref);
+                        int child_value = EvaluateChildren(sentinal, isMinning);
                         value_array[sentinal] = child_value;
 
                         // After evaluating, free the children nodes from memory to save space (exponentially)
@@ -510,7 +531,7 @@ public class Chess4DEvaluator : MonoBehaviour
                         int parent_value = value_array[sentinal];
 
                         // Since we just moved up into this node, all its children have been added. Since this is the case, we'll evaluate the children.
-                        int child_value = EvaluateChildren(sentinal, isMinning, current_depth, isPlayingWhite, isWhite, parent_value, state_ref);
+                        int child_value = EvaluateChildren(sentinal, isMinning);
                         value_array[sentinal] = child_value;
 
                         // After evaluating, free the children nodes from memory to save space (exponentially)
@@ -543,6 +564,11 @@ public class Chess4DEvaluator : MonoBehaviour
 
         // Return true for a succesful iteration
         return true;
+    }
+
+    private float GetTime()
+    {
+        return DateTime.Now.Minute * 60*1000 + DateTime.Now.Second*1000 + DateTime.Now.Millisecond;
     }
 
     // Fill the buffer with piece references that the current evaluating player can hypothetically mvoe
@@ -609,9 +635,9 @@ public class Chess4DEvaluator : MonoBehaviour
     }
 
     // Given a specified tree node, iterate through its children based and find the minimax of the children's scores
-    private int EvaluateChildren(int node, bool isMinning, int depth, bool isWhiteStart, bool isWhitePlaying, int parent_value, int[] state)
+    private int EvaluateChildren(int node, bool isMinning)
     {
-
+        int minimax_value = 0;
         // If neither our supplied node nor its child are null
         if (node != NULL && child_array[node] != NULL)
         {
@@ -620,40 +646,57 @@ public class Chess4DEvaluator : MonoBehaviour
 
             // Keep track of the minimum and maximum values of the sentinal. Techinally we can make a conditional and only keep track of one, but its
             // easier to debug the parity math if we can print out both of them, the decision it made, and other useful info like depth and color
-            int max_value = value_array[sentinal];
-            int min_value = value_array[sentinal];
-            
-            // This counter is a safegaurd against infinite loops. Just makes sure we arent spending longer than is possible iterating through nodes
-            // Can probably be removed, since it was simply added for some debugging cases.
+            //int max_value = value_array[sentinal];
+            //int min_value = value_array[sentinal];
+
+            minimax_value = value_array[sentinal];
+
+            //min_array.Initialize();
             int counter = 0;
-
-            // While we have a node to traverse forwards into
-            while (next_array[sentinal] != NULL && counter < SEARCH_BREADTH + 1)
-            {
-                // Move on into the next node
-                sentinal = next_array[sentinal];
-
-                // compare the minimax values of the new node with the min and max
-                min_value = Mathf.Min(min_value, value_array[sentinal]);
-                max_value = Mathf.Max(max_value, value_array[sentinal]);
-                counter++;
-            }
-            // If we are minimizing, return the minimum, if not return the maximum.
+            int[] min_array = new int[4];
             if (isMinning)
             {
-                return min_value;
+                // While we have a node to traverse forwards into
+                while (next_array[sentinal] != NULL)
+                {
+                    // Move on into the next node
+                    sentinal = next_array[sentinal];
+                    min_array[counter] = value_array[sentinal];
+                    if (counter == 3) { minimax_value = Mathf.Min(minimax_value, Mathf.Min(min_array)); }
+                    counter = (counter + 1) & 3;
+                    // compare the minimax values of the new node with the min and max
+                    //min_value = Mathf.Min(min_value, value_array[sentinal]);
+                    //max_value = Mathf.Max(max_value, value_array[sentinal]);
+                }
+                minimax_value = Mathf.Min(minimax_value, Mathf.Min(min_array));
+
             }
             else
             {
-                return max_value;
+                while (next_array[sentinal] != NULL)
+                {
+                    // Move on into the next node
+                    sentinal = next_array[sentinal];
+                    min_array[counter] = value_array[sentinal];
+                    if (counter == 3) { minimax_value = Mathf.Max(minimax_value, Mathf.Max(min_array)); }
+                    counter = (counter + 1) & 3;
+                    // compare the minimax values of the new node with the min and max
+                    //min_value = Mathf.Min(min_value, value_array[sentinal]);
+                    //max_value = Mathf.Max(max_value, value_array[sentinal]);
+                }
+                minimax_value = Mathf.Max(minimax_value, Mathf.Max(min_array));
             }
+            // If we are minimizing, return the minimum, if not return the maximum.
+            //if (isMinning)
+            //{
+            //    return min_value;
+            //}
+            //else
+            //{
+            //    return max_value;
+            //}
         }
-        // if we fail to find the node or its children, throw a log error.
-        else
-        {
-            Debug.LogError("Warning, attempting to evaluate nodes without children");
-            return 0;
-        }
+        return minimax_value;
     }
 
     // Final cleanup process after ending the tree construction
@@ -665,7 +708,7 @@ public class Chess4DEvaluator : MonoBehaviour
         //EvaluateChildren(gbl_tree_root_ref[0], isPlayingWhite, 0, isPlayingWhite, isPlayingWhite, 0, board_state);
 
         // pick a random move that ties with the best scored one.
-        int return_move = good_moves[Random.Range(0, good_moves_count)];
+        int return_move = good_moves[UnityEngine.Random.Range(0, good_moves_count)];
         move_chosen_buffer = return_move;
 
         // And free the move tree from memory since its no longer needed
@@ -852,6 +895,9 @@ public class Chess4DEvaluator : MonoBehaviour
     // Takes in starting coordinate, and the index of the forward and lateral direction in which to cast in.
     // Stores casting result in the array cast_results, and takes in the current board state to cast within.
     // Stores NULL as the casting result if it starts going out of bounds
+    // Takes in starting coordinate, and the index of the forward and lateral direction in which to cast in.
+    // Stores casting result in the array cast_results, and takes in the current board state to cast within.
+    // Stores NULL as the casting result if it starts going out of bounds
     private void CastForPiece(int x, int y, int z, int w, int lateral, int forward, int[] cast_results, int[] state)
     {
         int px = x;
@@ -892,7 +938,6 @@ public class Chess4DEvaluator : MonoBehaviour
         }
         //return cast_results;
     }
-
 
     ///////////////////////////////////////////
     ///                                     ///
@@ -1126,13 +1171,6 @@ public class Chess4DEvaluator : MonoBehaviour
         }
     }
 
-    // Do not call as it will crash the program
-    private void CrashProgram()
-    {
-        GameObject obj = null;
-        print(obj.name);
-    }
-
     // Make a coordinate into a nice string to output
     private string CalculateCoordinateString(int x, int y, int z, int w)
     {
@@ -1165,20 +1203,30 @@ public class Chess4DEvaluator : MonoBehaviour
     // Determines if a coordinate is out of bounds
     public bool isOutOfBounds(int xi, int yi, int zi, int wi)
     {
-        bool x_out = xi < 0 || 3 < xi;
-        bool y_out = yi < 0 || 3 < yi;
-        bool z_out = zi < 0 || 3 < zi;
-        bool w_out = wi < 0 || 3 < wi;
+        int min = Mathf.Min(xi, yi, zi, wi);
+        int max = Mathf.Max(xi, yi, zi, wi);
 
-        return x_out || y_out || z_out || w_out;
+        return min < 0 || max > 3;
+    }
+    public bool IsVectorOutOfBounds(Vector4 vec)
+    {
+        int min = Mathf.RoundToInt(Mathf.Min(vec.x, vec.y, vec.z, vec.w));
+        int max = Mathf.RoundToInt(Mathf.Max(vec.x, vec.y, vec.z, vec.w));
+
+        return min < 0 || max > 3;
     }
 
     // Calculates the index of a coordinate without checking bounds
     public int CoordToIndex(int xi, int yi, int zi, int wi)
     {
+        //return (xi     ) + (yi << 2) + (zi << 4) + (wi << 6);
         return ((xi & 3 ) << 0) + ((yi & 3) << 2) + ((zi & 3) << 4) + ((wi & 3) << 6);
     }
 
+    public int VectorToIndex(Vector4 vec)
+    {
+        return Mathf.RoundToInt(Vector4.Dot(vec, new Vector4(1, 4, 16, 64)));
+    }
 
     ///////////////////////////////////////////
     ///                                     ///
@@ -1756,7 +1804,6 @@ public class Chess4DEvaluator : MonoBehaviour
             }
         }
     }
-
 
     //// Unused code for binary tree I really like. Spent a long time making it, then realized "what do I need a binary tree for?"
     //// Still a nice little method, so I'm keeping it in here until I can extract it to a new project
