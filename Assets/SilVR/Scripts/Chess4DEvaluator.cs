@@ -110,7 +110,15 @@ public class Chess4DEvaluator : MonoBehaviour
 
     //public float time_spent_filling_pieces = 0;
     //public float time_spent_filling_moves = 0;
-    //public float time_spent_evaluating_nodes = 0;
+    float time_spent_evaluating_nodes = 0;
+
+    int time_spent_kings = 0;
+    int time_spent_queens = 0;
+    int time_spent_bishops = 0;
+    int time_spent_knights = 0;
+    int time_spent_rooks = 0;
+    int time_spent_pawns = 0;
+
     //public float time_spent_freeing_children = 0;
 
 
@@ -128,6 +136,224 @@ public class Chess4DEvaluator : MonoBehaviour
     int[] forwards_y = new int[4] { 1, -1, 0, 0 };
     int[] forwards_z = new int[4] { 0, 0, 0, 0 };
     int[] forwards_w = new int[4] { 0, 0, 1, -1 };
+
+    int[] pawn_moves_x = new int[] { 0, 0, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0 };
+    int[] pawn_moves_y = new int[] { 1,-1, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int[] pawn_moves_z = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1, 1,-1,-1 };
+    int[] pawn_moves_w = new int[] { 0, 0, 1,-1, 0, 0, 0, 0, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1 };
+
+
+
+    Vector4[] pawn_moves = new Vector4[20]
+                            {
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0,-1),
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4(-1,-1, 0, 0),
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0,-1,-1, 0),
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4(-1, 0, 0,-1),
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0,-1,-1)
+                            };
+    Vector4[] knight_moves = new Vector4[32]
+                            {
+                                    new Vector4( 1, 2, 0, 0),
+                                    new Vector4( 1,-2, 0, 0),
+                                    new Vector4(-1, 2, 0, 0),
+                                    new Vector4(-1,-2, 0, 0),
+
+                                    new Vector4( 2, 1, 0, 0),
+                                    new Vector4( 2,-1, 0, 0),
+                                    new Vector4(-2, 1, 0, 0),
+                                    new Vector4(-2,-1, 0, 0),
+
+                                    new Vector4( 1, 0, 0, 2),
+                                    new Vector4( 1, 0, 0,-2),
+                                    new Vector4(-1, 0, 0, 2),
+                                    new Vector4(-1, 0, 0,-2),
+
+                                    new Vector4( 2, 0, 0, 1),
+                                    new Vector4( 2, 0, 0,-1),
+                                    new Vector4(-2, 0, 0, 1),
+                                    new Vector4(-2, 0, 0,-1),
+
+                                    new Vector4( 0, 2, 1, 0),
+                                    new Vector4( 0, 2,-1, 0),
+                                    new Vector4( 0,-2, 1, 0),
+                                    new Vector4( 0,-2,-1, 0),
+
+                                    new Vector4( 0, 1, 2, 0),
+                                    new Vector4( 0, 1,-2, 0),
+                                    new Vector4( 0,-1, 2, 0),
+                                    new Vector4( 0,-1,-2, 0),
+
+                                    new Vector4( 0, 0, 1, 2),
+                                    new Vector4( 0, 0, 1,-2),
+                                    new Vector4( 0, 0,-1,-2),
+                                    new Vector4( 0, 0, 1,-2),
+
+                                    new Vector4( 0, 0, 2, 1),
+                                    new Vector4( 0, 0, 2,-1),
+                                    new Vector4( 0, 0,-2, 1),
+                                    new Vector4( 0, 0,-2,-1)
+
+
+                            };
+    
+    Vector4[] rook_moves = new Vector4[24]
+                            {
+                                    new Vector4( 1, 0, 0, 0),
+                                    new Vector4( 2, 0, 0, 0),
+                                    new Vector4( 3, 0, 0, 0),
+                                    new Vector4(-1, 0, 0, 0),
+                                    new Vector4(-2, 0, 0, 0),
+                                    new Vector4(-3, 0, 0, 0),
+
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0, 2, 0, 0),
+                                    new Vector4( 0, 3, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+                                    new Vector4( 0,-2, 0, 0),
+                                    new Vector4( 0,-3, 0, 0),
+
+                                    new Vector4( 0, 0, 1, 0),
+                                    new Vector4( 0, 0, 2, 0),
+                                    new Vector4( 0, 0, 3, 0),
+                                    new Vector4( 0, 0,-1, 0),
+                                    new Vector4( 0, 0,-2, 0),
+                                    new Vector4( 0, 0,-3, 0),
+
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0, 2),
+                                    new Vector4( 0, 0, 0, 3),
+                                    new Vector4( 0, 0, 0,-1),
+                                    new Vector4( 0, 0, 0,-2),
+                                    new Vector4( 0, 0, 0,-3)
+                            };
+
+    Vector4[] bishop_moves = new Vector4[48]
+                        {
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4( 2, 2, 0, 0),
+                                    new Vector4( 3, 3, 0, 0),
+
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4(-2, 2, 0, 0),
+                                    new Vector4(-3, 3, 0, 0),
+
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4( 2,-2, 0, 0),
+                                    new Vector4( 3,-3, 0, 0),
+
+                                    new Vector4(-1,-1, 0, 0),
+                                    new Vector4(-2,-2, 0, 0),
+                                    new Vector4(-3,-3, 0, 0),
+
+
+
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4( 2, 0, 0, 2),
+                                    new Vector4( 3, 0, 0, 3),
+
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4(-2, 0, 0, 2),
+                                    new Vector4(-3, 0, 0, 3),
+
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4( 2, 0, 0,-2),
+                                    new Vector4( 3, 0, 0,-3),
+
+                                    new Vector4(-1, 0, 0,-1),
+                                    new Vector4(-2, 0, 0,-2),
+                                    new Vector4(-3, 0, 0,-3),
+
+
+
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0, 2, 2, 0),
+                                    new Vector4( 0, 3, 3, 0),
+
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0,-2, 2, 0),
+                                    new Vector4( 0,-3, 3, 0),
+
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0, 2,-2, 0),
+                                    new Vector4( 0, 3,-3, 0),
+
+                                    new Vector4( 0,-1,-1, 0),
+                                    new Vector4( 0,-2,-2, 0),
+                                    new Vector4( 0,-3,-3, 0),
+
+
+
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0, 2, 2),
+                                    new Vector4( 0, 0, 3, 3),
+
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0,-2, 2),
+                                    new Vector4( 0, 0,-3, 3),
+
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0, 2,-2),
+                                    new Vector4( 0, 0, 3,-3),
+
+                                    new Vector4( 0, 0,-1,-1),
+                                    new Vector4( 0, 0,-2,-2),
+                                    new Vector4( 0, 0,-3,-3)
+                        };
+
+    Vector4[] king_moves = new Vector4[24]
+                        {
+                                    new Vector4( 1, 0, 0, 0),
+                                    new Vector4(-1, 0, 0, 0),
+
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+
+                                    new Vector4( 0, 0, 1, 0),
+                                    new Vector4( 0, 0,-1, 0),
+
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0,-1),
+
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4(-1,-1, 0, 0),
+
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4(-1, 0, 0,-1),
+
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0,-1,-1, 0),
+
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0,-1,-1),
+                        };
+
+    Vector4 dot_values = new Vector4(1, 4, 16, 64);
+
+    
 
 
     int[] point_table = new int[13]
@@ -363,7 +589,15 @@ public class Chess4DEvaluator : MonoBehaviour
             FillMoveBuffer(gbl_state_ref, pieces_to_move[0]);
             isAdvancing = true;
             move_chosen_buffer = 0;
-        }
+
+            time_spent_evaluating_nodes = 0;
+            time_spent_kings = 0;
+            time_spent_queens = 0;
+            time_spent_bishops = 0;
+            time_spent_knights = 0;
+            time_spent_rooks = 0;
+            time_spent_pawns = 0;
+}
         else
         {
             Debug.Log("Warning, tree contruction currently busy. If you continue getting this, its probably crashed irreparably");
@@ -437,7 +671,9 @@ public class Chess4DEvaluator : MonoBehaviour
             // pieces, it will simply skip over this step, leaving the move_count at 0.
             if (current_move == 0 && current_piece < pieces_count)
             {
+
                 FillMoveBuffer(state_ref, pieces_to_move[current_piece]);
+
             }
             // If we still have moves to evaluate
             if (current_move < move_count)
@@ -532,6 +768,10 @@ public class Chess4DEvaluator : MonoBehaviour
 
                         // Since we just moved up into this node, all its children have been added. Since this is the case, we'll evaluate the children.
                         int child_value = EvaluateChildren(sentinal, isMinning);
+
+
+                        
+                        
                         value_array[sentinal] = child_value;
 
                         // After evaluating, free the children nodes from memory to save space (exponentially)
@@ -542,6 +782,7 @@ public class Chess4DEvaluator : MonoBehaviour
                     RevertEncodedMovement(state_ref, move_array[sentinal]);
                     sentinal = next_array[sentinal];
                     ApplyEncodedMovement(state_ref, move_array[sentinal]);
+
                 }
                 // If we've exited to a node that has no parent (the very top node), we know it also has no next node. So if we cant find
                 // any parent or next node, simply return false since we've made it to the end of the tree. Note that this doesnt run immediately
@@ -566,7 +807,7 @@ public class Chess4DEvaluator : MonoBehaviour
         return true;
     }
 
-    private float GetTime()
+    private int GetTime()
     {
         return DateTime.Now.Minute * 60*1000 + DateTime.Now.Second*1000 + DateTime.Now.Millisecond;
     }
@@ -900,6 +1141,8 @@ public class Chess4DEvaluator : MonoBehaviour
     // Stores NULL as the casting result if it starts going out of bounds
     private void CastForPiece(int x, int y, int z, int w, int lateral, int forward, int[] cast_results, int[] state)
     {
+        int[] p = new int[4] { x, y, z, w };
+
         int px = x;
         int py = y;
         int pz = z;
@@ -909,6 +1152,8 @@ public class Chess4DEvaluator : MonoBehaviour
         int dy = 0;
         int dz = 0;
         int dw = 0;
+
+        
 
         if (lateral < laterals_x.Length)
         {
@@ -1225,7 +1470,7 @@ public class Chess4DEvaluator : MonoBehaviour
 
     public int VectorToIndex(Vector4 vec)
     {
-        return Mathf.RoundToInt(Vector4.Dot(vec, new Vector4(1, 4, 16, 64)));
+        return Mathf.RoundToInt(Vector4.Dot(vec, dot_values));
     }
 
     ///////////////////////////////////////////
@@ -1265,602 +1510,250 @@ public class Chess4DEvaluator : MonoBehaviour
 
         if (piece_type == 1)
         {
-            for (int i = 0; i < laterals_x.Length; i++)
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 24; i++)
             {
-                for (int j = 0; j < forwards_x.Length; j++)
+                sv = pv + king_moves[i];
+                if (!IsVectorOutOfBounds(sv))
                 {
-                    int lateral = i;
-                    int forward = j;
-                    bool occluded = false;
-                    CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                    for (int k = 0; k < 1; k++)
+                    target_index = VectorToIndex(sv);
+                    int result = state[target_index];
+                    if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
                     {
-                        int result = cast_results[k];
-                        // Our results are NULL when casting out of bounds
-                        if (result != NULL && !occluded)
-                        {
-                            // so therefore if it isnt NULL, we are within bounds for the cast;
-                            if (result == 0)
-                            {
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
-
-                                // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                                int encoded_movement = encode_movement(square, target_index, 0);
-                                move_buffer[move_count] = encoded_movement;
-                                move_count++;
-                            }
-                            else if (isBlackPiece(result) == isBlackPiece(piece))
-                            {
-                                occluded = true;
-                            }
-                            else if (isBlackPiece(result) != isBlackPiece(piece))
-                            {
-                                occluded = true;
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
-
-                                int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                                move_buffer[move_count] = encoded_movement;
-                                move_count++;
-                            }
-                        }
-                    }
-                }
-
-            }
-            for (int i = 0; i < laterals_x.Length; i++)
-            {
-                int lateral = i;
-                int forward = NULL;
-                bool occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < 1; j++)
-                {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
-                    {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
-                        if (result == 0)
-                        {
-                            target_index = CoordToIndex(sx + laterals_x[i] * (j + 1),
-                                                        sy + laterals_y[i] * (j + 1),
-                                                        sz + laterals_z[i] * (j + 1),
-                                                        sw + laterals_w[i] * (j + 1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, 0);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
-                        {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + laterals_x[i] * (j + 1),
-                                                        sy + laterals_y[i] * (j + 1),
-                                                        sz + laterals_z[i] * (j + 1),
-                                                        sw + laterals_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                    }
-                }
-
-                lateral = NULL;
-                forward = i;
-                occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < 1; j++)
-                {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
-                    {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
-                        if (result == 0)
-                        {
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, 0);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
-                        {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
+                        int encoded_movement = encode_movement(square, target_index, result);
+                        move_buffer[move_count] = encoded_movement;
+                        move_count++;
                     }
                 }
             }
+
+
+            //int stop_watch_end = GetTime();
+            //time_spent_kings += (stop_watch_end - stop_watch_start);
         }
         else if (piece_type == 2)
         {
-            for (int i = 0; i < laterals_x.Length; i++)
-            {
-                for (int j = 0; j < forwards_x.Length; j++)
-                {
-                    int lateral = i;
-                    int forward = j;
-                    bool occluded = false;
-                    CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                    for (int k = 0; k < cast_results.Length; k++)
-                    {
-                        int result = cast_results[k];
-                        // Our results are NULL when casting out of bounds
-                        if (result != NULL && !occluded)
-                        {
-                            // so therefore if it isnt NULL, we are within bounds for the cast;
-                            if (result == 0)
-                            {
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
+            //int stop_watch_start = GetTime();
 
-                                // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                                int encoded_movement = encode_movement(square, target_index, 0);
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 48; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + bishop_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_buffer[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
                                 move_buffer[move_count] = encoded_movement;
                                 move_count++;
                             }
-                            else if (isBlackPiece(result) == isBlackPiece(piece))
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+            for (int i = 0; i < 24; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + rook_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_buffer[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
                             {
-                                occluded = true;
-                            }
-                            else if (isBlackPiece(result) != isBlackPiece(piece))
-                            {
-                                occluded = true;
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
-
-                                int encoded_movement = encode_movement(square, target_index, state[target_index]);
+                                int encoded_movement = encode_movement(square, target_index, result);
                                 move_buffer[move_count] = encoded_movement;
                                 move_count++;
                             }
+                            break;
                         }
                     }
-                }
-
-            }
-            for (int i = 0; i < laterals_x.Length; i++)
-            {
-                int lateral = i;
-                int forward = NULL;
-                bool occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < cast_results.Length; j++)
-                {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
+                    else
                     {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
-                        if (result == 0)
-                        {
-                            target_index = CoordToIndex(sx + laterals_x[i]*(j+1),
-                                                        sy + laterals_y[i]*(j+1),
-                                                        sz + laterals_z[i]*(j+1),
-                                                        sw + laterals_w[i]*(j+1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, 0);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
-                        {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + laterals_x[i] * (j + 1),
-                                                        sy + laterals_y[i] * (j + 1),
-                                                        sz + laterals_z[i] * (j + 1),
-                                                        sw + laterals_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                    }
-                }
-
-                lateral = NULL;
-                forward = i;
-                occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < cast_results.Length; j++)
-                {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
-                    {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
-                        if (result == 0)
-                        {
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, 0);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
-                        {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
+                        break;
                     }
                 }
             }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_queens += (stop_watch_end - stop_watch_start);
         }
         else if (piece_type == 3)
         {
-            for (int i = 0; i < laterals_x.Length; i++)
+            //int stop_watch_start = GetTime();
+
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 48; i += 3)
             {
-                for (int j = 0; j < forwards_x.Length; j++)
+                for (int j = 0; j < 3; j++)
                 {
-                    int lateral = i;
-                    int forward = j;
-                    bool occluded = false;
-                    CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                    for (int k = 0; k < cast_results.Length; k++)
+                    sv = pv + bishop_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
                     {
-                        int result = cast_results[k];
-                        // Our results are NULL when casting out of bounds
-                        if (result != NULL && !occluded)
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
                         {
-                            // so therefore if it isnt NULL, we are within bounds for the cast;
-                            if (result == 0)
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_buffer[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
                             {
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
-
-                                // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                                int encoded_movement = encode_movement(square, target_index, 0);
+                                int encoded_movement = encode_movement(square, target_index, result);
                                 move_buffer[move_count] = encoded_movement;
                                 move_count++;
                             }
-                            else if (isBlackPiece(result) == isBlackPiece(piece))
-                            {
-                                occluded = true;
-                            }
-                            else if (isBlackPiece(result) != isBlackPiece(piece))
-                            {
-                                occluded = true;
-                                target_index = CoordToIndex(sx + laterals_x[i] * (k + 1) + forwards_x[j] * (k + 1),
-                                                            sy + laterals_y[i] * (k + 1) + forwards_y[j] * (k + 1),
-                                                            sz + laterals_z[i] * (k + 1) + forwards_z[j] * (k + 1),
-                                                            sw + laterals_w[i] * (k + 1) + forwards_w[j] * (k + 1));
-
-                                int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                                move_buffer[move_count] = encoded_movement;
-                                move_count++;
-                            }
+                            break;
                         }
                     }
+                    else
+                    {
+                        break;
+                    }
                 }
-
             }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_bishops += (stop_watch_end - stop_watch_start);
         }
         else if (piece_type == 4)
         {
-            for (int i = 0; i < laterals_x.Length; i++)
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+
+            for (int i = 0; i < 32; i++)
             {
-                for (int j = 0; j < forwards_x.Length; j++)
+                sv = pv + knight_moves[i];
+                if (!IsVectorOutOfBounds(sv))
                 {
-                    sx = px + 1 * forwards_x[i] + 2 * laterals_x[i];
-                    sy = py + 1 * forwards_y[i] + 2 * laterals_y[i];
-                    sz = pz + 1 * forwards_z[i] + 2 * laterals_z[i];
-                    sw = pw + 1 * forwards_w[i] + 2 * laterals_w[i];
-
-                    if (!isOutOfBounds(sx, sy, sz, sw))
+                    target_index = VectorToIndex(sv);
+                    int result = state[target_index];
+                    if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
                     {
-                        target_index = CoordToIndex(sx, sy, sz, sw);
-                        int result = state[target_index];
-                        if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            target_index = CoordToIndex(sx, sy, sz, sw);
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
+                        // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
+                        int encoded_movement = encode_movement(square, target_index, result);
+                        move_buffer[move_count] = encoded_movement;
+                        move_count++;
                     }
-
-                    sx = px + 2 * forwards_x[i] + 1 * laterals_x[i];
-                    sy = py + 2 * forwards_y[i] + 1 * laterals_y[i];
-                    sz = pz + 2 * forwards_z[i] + 1 * laterals_z[i];
-                    sw = pw + 2 * forwards_w[i] + 1 * laterals_w[i];
-
-                    if (!isOutOfBounds(sx, sy, sz, sw))
-                    {
-                        target_index = CoordToIndex(sx, sy, sz, sw);
-                        int result = state[target_index];
-                        if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            target_index = CoordToIndex(sx, sy, sz, sw);
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                    }
-
                 }
             }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_knights += (stop_watch_end - stop_watch_start);
         }
         else if (piece_type == 5)
         {
-            
-            for (int i = 0; i < laterals_x.Length; i++)
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 24; i += 3)
             {
-                int lateral = i;
-                int forward = NULL;
-                bool occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < cast_results.Length; j++)
+                for (int j = 0; j < 3; j++)
                 {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
+                    sv = pv + rook_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
                     {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
                         if (result == 0)
                         {
-                            target_index = CoordToIndex(sx + laterals_x[i]*(j+1),
-                                                        sy + laterals_y[i]*(j+1),
-                                                        sz + laterals_z[i]*(j+1),
-                                                        sw + laterals_w[i]*(j+1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
+                            int encoded_movement = encode_movement(square, target_index, result);
                             move_buffer[move_count] = encoded_movement;
                             move_count++;
                         }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
+                        else
                         {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + laterals_x[i] * (j + 1),
-                                                        sy + laterals_y[i] * (j + 1),
-                                                        sz + laterals_z[i] * (j + 1),
-                                                        sw + laterals_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
+                                move_buffer[move_count] = encoded_movement;
+                                move_count++;
+                            }
+                            break;
                         }
                     }
-                }
-
-                lateral = NULL;
-                forward = i;
-                occluded = false;
-                ClearCast();
-                CastForPiece(sx, sy, sz, sw, lateral, forward, cast_results, state);
-                for (int j = 0; j < cast_results.Length; j++)
-                {
-                    int result = cast_results[j];
-                    // Our results are NULL when casting out of bounds
-                    if (result != NULL && !occluded)
+                    else
                     {
-                        // so therefore if it isnt NULL, we are within bounds for the cast;
-                        if (result == 0)
-                        {
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
-                        else if (isBlackPiece(result) == isBlackPiece(piece))
-                        {
-                            occluded = true;
-                        }
-                        else if (isBlackPiece(result) != isBlackPiece(piece))
-                        {
-                            occluded = true;
-                            target_index = CoordToIndex(sx + forwards_x[i] * (j + 1),
-                                                        sy + forwards_y[i] * (j + 1),
-                                                        sz + forwards_z[i] * (j + 1),
-                                                        sw + forwards_w[i] * (j + 1));
-
-                            int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                            move_buffer[move_count] = encoded_movement;
-                            move_count++;
-                        }
+                        break;
                     }
                 }
             }
+
+
+            //int stop_watch_end = GetTime();
+            //time_spent_rooks += (stop_watch_end - stop_watch_start);
         }
         else if (piece_type == 6)
         {
-            sx += forwards_x[0 + piece_color];
-            sy += forwards_y[0 + piece_color];
-            sz += forwards_z[0 + piece_color];
-            sw += forwards_w[0 + piece_color];
+            //int stop_watch_start = GetTime();
 
-            target_index = CoordToIndex(sx, sy, sz, sw);
-            if (!isOutOfBounds(sx, sy, sz, sw) && state[target_index] == 0)
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+
+            for (int i = 0; i < 2; i++)
             {
-                int encoded_movement = encode_movement(square, target_index, state[target_index]);
-                move_buffer[move_count] = encoded_movement;
-                move_count++;
+                sv = pv + pawn_moves[2 * i + piece_color];
+
+                target_index = VectorToIndex(sv);
+                if (!IsVectorOutOfBounds(sv) && state[target_index] == 0)
+                {
+                    int encoded_movement = encode_movement(square, target_index, state[target_index]);
+                    move_buffer[move_count] = encoded_movement;
+                    move_count++;
+                }
             }
 
-            sx += laterals_x[0];
-            sy += laterals_y[0];
-            sz += laterals_z[0];
-            sw += laterals_w[0];
-
-            for (int i = 0; i < 4; i++)
+            for (int i = 2; i < 10; i++)
             {
-                sx += -laterals_x[i] + laterals_x[(i + 1) & 3];
-                sy += -laterals_y[i] + laterals_y[(i + 1) & 3];
-                sz += -laterals_z[i] + laterals_z[(i + 1) & 3];
-                sw += -laterals_w[i] + laterals_w[(i + 1) & 3];
-
-                target_index = CoordToIndex(sx, sy, sz, sw);
-                if (!isOutOfBounds(sx, sy, sz, sw) && state[target_index] != 0 && isBlackPiece(state[target_index]) != isBlackPiece(piece))
+                sv = pv + pawn_moves[2 * i + piece_color];
+                target_index = VectorToIndex(sv);
+                if (!IsVectorOutOfBounds(sv) && state[target_index] != 0 && isBlackPiece(state[target_index]) != isBlackPiece(piece))
                 {
                     move_buffer[move_count] = encode_movement(square, target_index, state[target_index]);
                     move_count++;
                 }
             }
 
-            sx = px;
-            sy = py;
-            sz = pz;
-            sw = pw;
-
-            sx += forwards_x[2 + piece_color];
-            sy += forwards_y[2 + piece_color];
-            sz += forwards_z[2 + piece_color];
-            sw += forwards_w[2 + piece_color];
-
-            target_index = CoordToIndex(sx, sy, sz, sw);
-            if (!isOutOfBounds(sx, sy, sz, sw) && state[target_index] == 0)
-            {
-                move_buffer[move_count] = encode_movement(square, target_index, state[target_index]);
-                move_count++;
-            }
-
-            sx += laterals_x[0];
-            sy += laterals_y[0];
-            sz += laterals_z[0];
-            sw += laterals_w[0];
-
-            for (int i = 0; i < 4; i++)
-            {
-                sx += -laterals_x[i] + laterals_x[(i + 1) & 3];
-                sy += -laterals_y[i] + laterals_y[(i + 1) & 3];
-                sz += -laterals_z[i] + laterals_z[(i + 1) & 3];
-                sw += -laterals_w[i] + laterals_w[(i + 1) & 3];
-
-                target_index = CoordToIndex(sx, sy, sz, sw);
-                if (!isOutOfBounds(sx, sy, sz, sw) && state[target_index] != 0 && isBlackPiece(state[target_index]) != isBlackPiece(piece))
-                {
-                    move_buffer[move_count] = encode_movement(square, target_index, state[target_index]);
-                    move_count++;
-                }
-            }
+            //int stop_watch_end = GetTime();
+            //time_spent_pawns += (stop_watch_end - stop_watch_start);
         }
     }
-
-    //// Unused code for binary tree I really like. Spent a long time making it, then realized "what do I need a binary tree for?"
-    //// Still a nice little method, so I'm keeping it in here until I can extract it to a new project
-    
-    //void AddToTree(int[] moves_head, int encoded_move)
-    //{
-    //    //int encoded_value = ExtractMoveValue(encoded_move);
-    //    int sentinal0 = moves_head[0];
-    //    int sentinal1 = moves_head[0];
-    //    if (sentinal0 == NULL)
-    //    {
-    //        int index = 0;
-
-    //        move_array[index] = encoded_move;
-    //        right_array[index] = NULL;
-    //        left_array[index] = NULL;
-    //        parent_array[index] = NULL;
-    //        moves_head[0] = index;
-    //    }
-    //    else
-    //    {
-    //        bool is_going_left = true;
-    //        while (sentinal1 != NULL)
-    //        {
-    //            int encoded_value = ExtractMoveValue(encoded_move);
-    //            int sentinal_value = ExtractMoveValue(move_array[sentinal0]);
-    //            if (encoded_value <= sentinal_value)
-    //            {
-    //                sentinal1 = left_array[sentinal0];
-    //                is_going_left = true;
-    //            }
-    //            else if (encoded_value > sentinal_value)
-    //            {
-    //                sentinal1 = right_array[sentinal0];
-    //                is_going_left = false;
-    //            }
-    //            if (sentinal1 != NULL)
-    //            {
-    //                sentinal0 = sentinal1;
-    //            }
-    //        }
-    //        sentinal1 = GetFreeMemoryAddress();
-    //        int next_node = sentinal1;
-    //        if (is_going_left)
-    //        {
-    //            left_array[sentinal0] = sentinal1;
-    //        }
-    //        else
-    //        {
-    //            right_array[sentinal0] = sentinal1;
-    //        }
-
-    //        move_array[next_node] = encoded_move;
-    //        right_array[next_node] = NULL;
-    //        left_array[next_node] = NULL;
-    //        parent_array[next_node] = sentinal0;
-    //    }
-    //}
-
 }
