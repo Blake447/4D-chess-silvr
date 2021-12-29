@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
-  m_Name: ResetBoard
+  m_Name: Chess4DPieceInterface
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: b66aee630e56d89479ba0e1bb10749d5,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: ff608eaceff27b042b855ec4210c78ed,
     type: 2}
   udonAssembly: 
   assemblyError: 
-  sourceCsScript: {fileID: 11500000, guid: bced02a7623fc3147adf3f41ac00fab3, type: 3}
+  sourceCsScript: {fileID: 11500000, guid: ee82c10e5b0d94047a542f0c3adaf078, type: 3}
   behaviourSyncMode: 0
   behaviourIDHeapVarName: __refl_const_intnl_udonTypeID
   compileErrors: []
@@ -25,7 +25,6 @@ MonoBehaviour:
     SerializedFormat: 2
     SerializedBytes: 
     ReferencedUnityObjects:
-    - {fileID: 11500000, guid: b18fe59e4070a054b82d1b42130b774f, type: 3}
     - {fileID: 11500000, guid: 071a2ce4c311b5148b8b2c234aa014d2, type: 3}
     SerializedBytesString: 
     Prefab: {fileID: 0}
@@ -51,7 +50,7 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: evaluator
+      Data: board
     - Name: $v
       Entry: 7
       Data: 2|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
@@ -63,7 +62,7 @@ MonoBehaviour:
       Data: 4|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Chess4DEvaluator, Assembly-CSharp
+      Data: Chess4DBoard, Assembly-CSharp
     - Name: 
       Entry: 8
       Data: 
@@ -78,10 +77,10 @@ MonoBehaviour:
       Data: VRCUdonUdonBehaviour
     - Name: symbolOriginalName
       Entry: 1
-      Data: evaluator
+      Data: board
     - Name: symbolUniqueName
       Entry: 1
-      Data: evaluator
+      Data: board
     - Name: symbolDefaultValue
       Entry: 6
       Data: 
@@ -114,7 +113,7 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: board
+      Data: isInitialized
     - Name: $v
       Entry: 7
       Data: 6|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
@@ -126,7 +125,7 @@ MonoBehaviour:
       Data: 8|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Chess4DBoard, Assembly-CSharp
+      Data: System.Boolean, mscorlib
     - Name: 
       Entry: 8
       Data: 
@@ -138,13 +137,13 @@ MonoBehaviour:
       Data: 0
     - Name: symbolResolvedTypeName
       Entry: 1
-      Data: VRCUdonUdonBehaviour
+      Data: SystemBoolean
     - Name: symbolOriginalName
       Entry: 1
-      Data: board
+      Data: isInitialized
     - Name: symbolUniqueName
       Entry: 1
-      Data: board
+      Data: isInitialized
     - Name: symbolDefaultValue
       Entry: 6
       Data: 
@@ -164,8 +163,8 @@ MonoBehaviour:
       Entry: 8
       Data: 
     - Name: userBehaviourSource
-      Entry: 10
-      Data: 1
+      Entry: 6
+      Data: 
     - Name: 
       Entry: 8
       Data: 

@@ -17,7 +17,7 @@ public class Chess4DEvaluator : MonoBehaviour
 
     // Reference to chess board AI is attached to
     Chess4DBoard root_board;
-
+    //GameManagerUdon game_manager;
 
     ///////////////////////////////////////////
     ///         Startup Parameters          ///
@@ -71,6 +71,7 @@ public class Chess4DEvaluator : MonoBehaviour
     
     int[] gbl_state_ref;
 
+    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
 
     ///////////////////////////////////////////
     ///    Variable Count Storage Arrays    ///
@@ -97,20 +98,29 @@ public class Chess4DEvaluator : MonoBehaviour
 
     // buffer for a virtual board state used for analysis
     int[] board_state;
-
-    // is playing white
-    bool isPlayingWhite = true;
-
     // advancing and clearing flags
     bool isAdvancing = false;
     bool isClearingTree = false;
     bool isBusy = false;
 
     int move_chosen_buffer = 0;
+    bool interuptFlag = false;
+    bool gbl_isPlayingWhite = false;
+
+    public bool isMoveQueued = false;
+
+    public int turn_queued_on = 0;
+    public bool queued_as_white = true;
+
+    public int turn_searching_for = 0;
+    public bool searching_as_white = true;
 
     //public float time_spent_filling_pieces = 0;
     //public float time_spent_filling_moves = 0;
     float time_spent_evaluating_nodes = 0;
+
+    public long time_spent_other = 0;
+    public long time_spent_moves = 0;
 
     int time_spent_kings = 0;
     int time_spent_queens = 0;
@@ -141,7 +151,6 @@ public class Chess4DEvaluator : MonoBehaviour
     int[] pawn_moves_y = new int[] { 1,-1, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, 0, 0, 0, 0 };
     int[] pawn_moves_z = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1, 1,-1,-1 };
     int[] pawn_moves_w = new int[] { 0, 0, 1,-1, 0, 0, 0, 0, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1 };
-
 
 
     Vector4[] pawn_moves = new Vector4[20]
@@ -211,7 +220,6 @@ public class Chess4DEvaluator : MonoBehaviour
 
 
                             };
-    
     Vector4[] rook_moves = new Vector4[24]
                             {
                                     new Vector4( 1, 0, 0, 0),
@@ -242,7 +250,6 @@ public class Chess4DEvaluator : MonoBehaviour
                                     new Vector4( 0, 0, 0,-2),
                                     new Vector4( 0, 0, 0,-3)
                             };
-
     Vector4[] bishop_moves = new Vector4[48]
                         {
                                     new Vector4( 1, 1, 0, 0),
@@ -315,7 +322,6 @@ public class Chess4DEvaluator : MonoBehaviour
                                     new Vector4( 0, 0,-2,-2),
                                     new Vector4( 0, 0,-3,-3)
                         };
-
     Vector4[] king_moves = new Vector4[24]
                         {
                                     new Vector4( 1, 0, 0, 0),
@@ -350,11 +356,7 @@ public class Chess4DEvaluator : MonoBehaviour
                                     new Vector4( 0, 0, 1,-1),
                                     new Vector4( 0, 0,-1,-1),
                         };
-
     Vector4 dot_values = new Vector4(1, 4, 16, 64);
-
-    
-
 
     int[] point_table = new int[13]
     {
@@ -378,6 +380,44 @@ public class Chess4DEvaluator : MonoBehaviour
     // note this means all piece count variables global references
 
 
+    public void QueueMove(int turn, bool isWhite)
+    {
+        turn_queued_on = turn;
+        queued_as_white = isWhite;
+        isMoveQueued = true;
+    }
+
+    private void Update()
+    {
+        if (!isBusy && isMoveQueued)
+        {
+            turn_searching_for = turn_queued_on;
+            searching_as_white = queued_as_white;
+            gbl_isPlayingWhite = searching_as_white;
+            isMoveQueued = false;
+            isBusy = true;
+
+            int position = queued_as_white ? 2 : 1;
+            root_board.SetTVBot(position, true);
+            StartSearchForMove();
+        }
+
+        if (!isClearingTree && isAdvancing)
+        {
+            for (int i = 0; i < STEPS_PER_FRAME; i++)
+            {
+                AdvanceTreeConstruction();
+            }
+        }
+        if (isClearingTree)
+        {
+            for (int i = 0; i < STEPS_PER_FRAME; i++)
+            {
+                AdvanceFreeingTree();
+            }
+
+        }
+    }
 
     // Adding and clearing methods for the move buffer. Stores possible moves as encoded values (not node adresses)
     private void AddMoveToBuffer(int move)
@@ -442,21 +482,25 @@ public class Chess4DEvaluator : MonoBehaviour
     ///                                     ///
     ///////////////////////////////////////////
 
+    // TODO: Make the AI use MakeMove() as this here wont be networked
     private void OnMoveFound()
     {
-        int move_found = move_chosen_buffer;
-        if (move_found != 0)
+        int position = searching_as_white ? 2 : 1;
+        root_board.SetTVBot(position, false);
+        if (!interuptFlag)
         {
-            MakeMoveOnBoard(root_board, move_chosen_buffer);
+            int move_found = move_chosen_buffer;
+            if (move_found != 0)
+            {
+                int encoded_move = move_chosen_buffer;
+                root_board.ProcessAIMove(encoded_move, turn_searching_for, searching_as_white);
+            }
+            else
+            {
+                Debug.Log("Warning, no chosen move detected");
+            }
+            //game_manager.OnMoveFound();
         }
-        else
-        {
-            Debug.Log("Warning, no chosen move detected");
-        }
-
-        // Logic to make AI play itself
-        isPlayingWhite = !isPlayingWhite;
-        //SearchForMove();
         isBusy = false;
     }
 
@@ -471,6 +515,16 @@ public class Chess4DEvaluator : MonoBehaviour
     ///                                     ///
     ///////////////////////////////////////////
 
+    public void SetEvaluatorColor(bool isBlack)
+    {
+        gbl_isPlayingWhite = !isBlack;
+    }
+
+    public void InteruptEvaluator()
+    {
+        interuptFlag = true;
+    }
+
     public bool IsEvaluatorBusy()
     {
         return isBusy;
@@ -479,22 +533,6 @@ public class Chess4DEvaluator : MonoBehaviour
     public void SearchForMove()
     {
         StartSearchForMove();
-    }
-
-    public void MakeMoveOnBoard(Chess4DBoard board, int move)
-    {
-        // Revert the board state to the boards actual state (cloning the array and discarding the current one)
-        LoadBoardState(board);
-
-        // Calculate the from and to squares for the board
-        int from = decode_from(move);
-        int to = decode_to(move);
-
-        // Tell the board to make the move
-        board.MakeMove(from, to);
-
-        // Update the board state array in the evaluator
-        LoadBoardState(root_board);
     }
 
     // Announce that a move is about to be made
@@ -544,37 +582,21 @@ public class Chess4DEvaluator : MonoBehaviour
         if (!isClearingTree && !isAdvancing)
         {
             isBusy = true;
-            StartTreeConstruction(isPlayingWhite);
+            StartTreeConstruction();
         }
     }
 
     // Tree construction and freeing is driven by certain flags in update function. So on update we
     // evaluate the flags and determine which, if any, of the iterative processes to advance.
-    private void Update()
-    {
-        if (!isClearingTree && isAdvancing)
-        {
-            for (int i = 0; i < STEPS_PER_FRAME; i++)
-            {
-                AdvanceTreeConstruction();
-            }
-        }
-        if (isClearingTree)
-        {
-            for (int i = 0; i < STEPS_PER_FRAME; i++)
-            {
-                AdvanceFreeingTree();
-            }
 
-        }
-    }
 
     // Begin the Tree Construction. TODO: Put the tree freeing logic into the start of this
-    private void StartTreeConstruction(bool isWhite)
+    private void StartTreeConstruction()
     {
         // Only do something if not already busy to avoid memory leakage
         if (!isClearingTree && !isAdvancing)
         {
+            interuptFlag = false;
             LoadBoardState(root_board);
             if (gbl_tree_root_ref[0] != NULL) { AddNullRoot(gbl_tree_root_ref); }
             gbl_sentinal_ref[0] = gbl_tree_root_ref[0];
@@ -583,7 +605,7 @@ public class Chess4DEvaluator : MonoBehaviour
             gbl_current_piece_ref[0] = 0;
             gbl_current_breadth_ref[0] = 0;
             gbl_state_ref = (int[])board_state.Clone();
-            int color = isWhite ? 1 : 0;
+            int color = searching_as_white ? 1 : 0;
             gbl_color_ref[0] = color;
             FillPieceBuffer(gbl_state_ref, true);
             FillMoveBuffer(gbl_state_ref, pieces_to_move[0]);
@@ -628,7 +650,7 @@ public class Chess4DEvaluator : MonoBehaviour
         if (isAdvancing)
         {
             // if we can, advance the tree, and store the advancability into isAdvancing.
-            isAdvancing = AddNextMoveToTreeAlt(gbl_sentinal_ref, gbl_current_piece_ref, gbl_current_move_ref, gbl_current_depth_ref, gbl_current_breadth_ref, gbl_state_ref, isPlayingWhite, SEARCH_BREADTH, SEARCH_DEPTH);
+            isAdvancing = AddNextMoveToTreeAlt(gbl_sentinal_ref, gbl_current_piece_ref, gbl_current_move_ref, gbl_current_depth_ref, gbl_current_breadth_ref, gbl_state_ref, searching_as_white, SEARCH_BREADTH, SEARCH_DEPTH);
             if (!isAdvancing)
             {
                 // If it failed, then end the tree construction
@@ -637,11 +659,13 @@ public class Chess4DEvaluator : MonoBehaviour
         }
     }
 
+
     // So how do you handle n-nary trees without recursion? A bunch of inout variables. And how do you handle inout variables without inout or pass by reference?
     // Integer arrays of length one. Takes in a bunch of integer arrays of length one to pass variables by reference, and executes one step in constructing the
     // move tree, return false when no more steps are to be taken
     private bool AddNextMoveToTreeAlt(int[] sentinal_ref, int[] current_piece_ref, int[] current_move_ref, int[] current_depth_ref, int[] current_breadth_ref, int[] state_ref, bool isPlayingWhite, int breadth, int depth)
     {
+
         bool isStartingBlack = !isPlayingWhite;
 
         // Unload the references into local scope so we don't need to keep using the array notation.
@@ -663,9 +687,7 @@ public class Chess4DEvaluator : MonoBehaviour
                 // Assume that we dont have any pieces set up, and do a piece search.
                 int color_parity = current_depth & 1;
                 bool isSearchingWhite = (color_parity == 0) == isStartingBlack;
-
                 FillPieceBuffer(state_ref, isSearchingWhite);
-
             }
             // If we havent evaluated any moves yet and have more pieces, then fill the move buffer with our current pieces moves. Note that if it cant find any
             // pieces, it will simply skip over this step, leaving the move_count at 0.
@@ -945,7 +967,7 @@ public class Chess4DEvaluator : MonoBehaviour
     {
         // Search the 1st level of the tree (after the empty root node) for immediately possible moves of minimax'd scores.
         // Loads all moves that tie in score into an array as to randomly pick one out.
-        FillGoodMoves(gbl_tree_root_ref[0], isPlayingWhite);
+        FillGoodMoves(gbl_tree_root_ref[0], gbl_isPlayingWhite);
         //EvaluateChildren(gbl_tree_root_ref[0], isPlayingWhite, 0, isPlayingWhite, isPlayingWhite, 0, board_state);
 
         // pick a random move that ties with the best scored one.
@@ -1197,6 +1219,7 @@ public class Chess4DEvaluator : MonoBehaviour
     // Initialize The evaluator. Pretty High level I guess? I dont know where to put this
     public void InitializeEvaluator(Chess4DBoard initializing_board)
     {
+        //game_manager = initializing_manager;
         root_board = initializing_board;
         LoadBoardState(root_board);
 
