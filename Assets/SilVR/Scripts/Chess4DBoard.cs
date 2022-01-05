@@ -523,18 +523,6 @@ public class Chess4DBoard : MonoBehaviour
                         bool isWhite = IsPlayerWhite();
                         bool isBlack = IsPlayerBlack();
 
-                        if (isWhite)
-                        {
-                            Debug.Log("White is attempting to move piece of color " + color);
-                        }
-                        if (isBlack)
-                        {
-                            Debug.Log("Black is attempting to move piece of color " + color);
-                        }
-                        if (!isBlack && !isWhite)
-                        {
-                            Debug.Log("Player not joined attempting to move piece of color " + color);
-                        }
                         int selected_color = PieceColor(squares[selected_square]);
                         bool joined_correctly = ((selected_color == 0) && isBlack) || ((selected_color == 1) && isWhite);
                         if (joined_correctly)
@@ -584,7 +572,6 @@ public class Chess4DBoard : MonoBehaviour
     }
     public int PieceColor(int piece_type)
     {
-        Debug.Log("Piece color piece_type " + piece_type + " + / 7 = " + (piece_type / 7));
         return piece_type / 7;
     }
 
@@ -726,9 +713,6 @@ public class Chess4DBoard : MonoBehaviour
         offsets_sorted[2] = offsets_sorted[2] >> 2;
         offsets_sorted[3] = offsets_sorted[3] >> 2;
         // Note that since triagonals and quadragonals must necessarily violate the forward-lateral rule, we dont need to check to see that the third-max is zero in any case
-
-        Debug.Log("Offsets  : ( " + offsets_sorted[0] + ", " + offsets_sorted[1] + ", " + offsets_sorted[2] + ", " + offsets_sorted[3] + " )");
-
         int offset_length = offsets_sorted[3];
         
         int[] offset_scaled = new int[4];
