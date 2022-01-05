@@ -253,7 +253,6 @@ public class Chess4DBoard : MonoBehaviour
         return false;
     }
 
-
     public bool IsAIPlaying()
     {
         return white_name == "TV-Bot-9000" || black_name == "TV-Bot-9000";
@@ -377,27 +376,35 @@ public class Chess4DBoard : MonoBehaviour
     }
     public void MergeToNetworkHistory()
     {
+
         int agreement = DetermineAgreement();
+        
         RevertBoardTo(agreement);
+        
+        
         while (move_history.Length < network_history.Length)
         {
             int encoded_move = network_history[move_history.Length];
             int from = DecodeFrom(encoded_move);
             int to = DecodeTo(encoded_move);
             int captured = DecodeCaptured(encoded_move);
-            MakeMove(from, to);
+            
+            if (network_history.Length != 0)
+            {
+                MakeMove(from, to);
+            }
         }
     }
     public int DetermineAgreement()
     {
         int i = 0;
         // If either history length is 0, then i < 0 will be 0 < 0, terminating early
-        while (i < move_history.Length && i < network_history.Length && move_history[i] == network_history[i]) { i++; }
+        while ( (i < move_history.Length) && (i < network_history.Length) && (move_history[i] == network_history[i]) ) { i++; }
         return i;
     }
     public void RevertBoardTo(int target_index)
     {
-        int valid_index = Mathf.Clamp(target_index + 1, 0, target_index + 2);
+        int valid_index = Mathf.Clamp(target_index, 0, target_index + 1);
         while (move_history.Length > valid_index) { UndoMove(); }
     }
 
@@ -409,7 +416,8 @@ public class Chess4DBoard : MonoBehaviour
             int from = DecodeFrom(encoded_move);
             int to = DecodeTo(encoded_move);
             int captured = DecodeCaptured(encoded_move);
-            UnmakeMove(from, to, captured);
+            int promoted = DecodePromoted(encoded_move);
+            UnmakeMove(from, to, captured, promoted);
             move_buffer = new int[move_history.Length - 1];
             Array.Copy(move_history, 0, move_buffer, 0, move_buffer.Length);
             move_history = (int[])move_buffer.Clone();
@@ -418,10 +426,24 @@ public class Chess4DBoard : MonoBehaviour
 
     public void MakeMove(int from, int to)
     {
+        int piece_moved = squares[from];
+        int piece_color = PieceColor(piece_moved);
         int captured = squares[to];
         squares[to] = squares[from];
         squares[from] = 0;
-        WriteHistory(from, to, captured);
+
+        int yt = (to >> 2) & 3;
+        int wt = (to >> 6) & 3;
+        bool isPawn = PieceTypeColorless(piece_moved) == 6;
+        int target_coord = piece_color == 1 ? 0 : 3;
+        int isPromoting = (isPawn && (yt == target_coord) && (wt == target_coord)) ? 1 : 0;
+
+        if (isPromoting == 1)
+        {
+            squares[to] = 2 + 6 * piece_color;
+        }
+
+        WriteHistory(from, to, captured, isPromoting);
 
         SetPieceFromSquares(from);
         SetPieceFromSquares(to);
@@ -437,17 +459,17 @@ public class Chess4DBoard : MonoBehaviour
 
     }
 
-    public void WriteHistory(int from, int to, int captured)
+    public void WriteHistory(int from, int to, int captured, int isPromoting)
     {
         move_buffer = new int[move_history.Length + 1];
         Array.Copy(move_history, 0, move_buffer, 0, move_history.Length);
-        move_buffer[move_buffer.Length - 1] = EncodeMove(from, to, captured);
+        move_buffer[move_buffer.Length - 1] = EncodeMove(from, to, captured, isPromoting);
         move_history = (int[])move_buffer.Clone();
     }
 
-    public int EncodeMove(int from, int to, int captured)
+    public int EncodeMove(int from, int to, int captured, int isPromoting)
     {
-        return ((from & 255) << 0) + ((to & 255) << 8) + ((captured & 255) << 16);
+        return ((from & 255) << 0) + ((to & 255) << 8) + ((captured & 255) << 16) + ((isPromoting & 1) << 24);
     }
     public int DecodeFrom(int encoded)
     {
@@ -461,7 +483,10 @@ public class Chess4DBoard : MonoBehaviour
     {
         return (encoded >> 16) & 255;
     }
-
+    public int DecodePromoted(int encoded)
+    {
+        return (encoded >> 24) & 1;
+    }
 
     public void OnInterfaceInteract(Vector3 position)
     {
@@ -472,7 +497,7 @@ public class Chess4DBoard : MonoBehaviour
         if ( isValidCoord )
         {
             int square = VectorToIndex(coord);
-            int piece = GetPiece(square);
+            int piece = squares[square];
             int color = PieceColor(piece);
             bool square_empty = piece == 0;
             int piece_type = PieceTypeColorless(piece);
@@ -486,10 +511,47 @@ public class Chess4DBoard : MonoBehaviour
             {
                 if (IsValidMove(selected_square, square))
                 {
-                    MakeMove(selected_square, square);
-                    selected_square = NULL;
-                    visualizer.SetVisualizerState(coord, 0, 0);
-                    PushToNetwork();
+                    if (Networking.LocalPlayer == null)
+                    {
+                        MakeMove(selected_square, square);
+                        selected_square = NULL;
+                        visualizer.SetVisualizerState(coord, 0, 0);
+                        PushToNetwork();
+                    }
+                    else
+                    {
+                        bool isWhite = IsPlayerWhite();
+                        bool isBlack = IsPlayerBlack();
+
+                        if (isWhite)
+                        {
+                            Debug.Log("White is attempting to move piece of color " + color);
+                        }
+                        if (isBlack)
+                        {
+                            Debug.Log("Black is attempting to move piece of color " + color);
+                        }
+                        if (!isBlack && !isWhite)
+                        {
+                            Debug.Log("Player not joined attempting to move piece of color " + color);
+                        }
+                        int selected_color = PieceColor(squares[selected_square]);
+                        bool joined_correctly = ((selected_color == 0) && isBlack) || ((selected_color == 1) && isWhite);
+                        if (joined_correctly)
+                        {
+                            MakeMove(selected_square, square);
+                            selected_square = NULL;
+                            visualizer.SetVisualizerState(coord, 0, 0);
+                            PushToNetwork();
+                        }
+                        else
+                        {
+                            selected_square = NULL;
+                            visualizer.SetVisualizerState(coord, 0, 0);
+                        }
+
+
+                    }
                 }
                 else
                 {
@@ -522,6 +584,7 @@ public class Chess4DBoard : MonoBehaviour
     }
     public int PieceColor(int piece_type)
     {
+        Debug.Log("Piece color piece_type " + piece_type + " + / 7 = " + (piece_type / 7));
         return piece_type / 7;
     }
 
@@ -744,7 +807,8 @@ public class Chess4DBoard : MonoBehaviour
             GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
             old_target.transform.position = PosFromIndex(target_piece);
         }
-        InitializeSquares();
+        //InitializeSquares();
+        Array.Copy(start_state, 0, squares, 0, squares.Length);
         SetPiecesFromSquares();
         move_history = new int[0];
         move_buffer = new int[0];
@@ -759,9 +823,14 @@ public class Chess4DBoard : MonoBehaviour
     }
 
 
-    public void UnmakeMove(int from, int to, int captured)
+    public void UnmakeMove(int from, int to, int captured, int promoted)
     {
         squares[from] = squares[to];
+        if (promoted == 1)
+        {
+            int piece_color = PieceColor(squares[from]);
+            squares[from] = 6 + 6 * piece_color;
+        }
         squares[to] = captured;
 
         SetPieceFromSquares(from);

@@ -19,10 +19,30 @@ public class PlayerController : UdonSharpBehaviour
 
     public void Update()
     {
-        CastCursorDesktop();
+        MoveCursorForPlayer();
     }
 
-    public void CastCursorDesktop()
+
+    public void SnapToPlayerHand()
+    {
+        VRCPlayerApi player_local = Networking.LocalPlayer;
+        if (player_local != null)
+        {
+            Vector3 hand_pos_right = player_local.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
+            Quaternion hand_rot_right = player_local.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
+            Vector3 target_pos_right = hand_pos_right + hand_rot_right * new Vector3(0.025f, 0.0f, 0.025f); ;
+
+            Vector3 hand_pos_left = player_local.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).position;
+            Quaternion hand_rot_left = player_local.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).rotation;
+            Vector3 target_pos_left = hand_pos_left + hand_rot_left * new Vector3(0.025f, 0.0f, 0.025f);
+
+            
+
+        }
+    }
+
+
+    public void MoveCursorForPlayer()
     {
         VRCPlayerApi player = Networking.LocalPlayer;
         int layermask = 1 << 14;
@@ -37,35 +57,51 @@ public class PlayerController : UdonSharpBehaviour
             Vector3 CastingDirection = Vector3.forward;
             if (player.IsUserInVR())
             {
+                Vector3 hand_pos_right = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
+                Quaternion hand_rot_right = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
+                Vector3 target_pos_right = hand_pos_right + hand_rot_right * new Vector3(0.025f, 0.0f, 0.025f); ;
+
+                Vector3 hand_pos_left = player.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).position;
+                Quaternion hand_rot_left = player.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).rotation;
+                Vector3 target_pos_left = hand_pos_left + hand_rot_left * new Vector3(0.025f, 0.0f, 0.025f);
+
                 position = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
                 rotation = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
                 CastingDirection = Vector3.right;
                 Vector3 hand_pos = player.GetBonePosition(HumanBodyBones.RightHand);
                 Vector3 fing_pos = player.GetBonePosition(HumanBodyBones.RightIndexProximal);
                 offset = fing_pos - hand_pos;
-            }
-            Vector3 cast_dir = rotation * CastingDirection;
-            if (player.IsUserInVR())
-            {
-                cast_dir = offset;
-            }
 
-
-            RaycastHit hit;
-            if (Physics.Raycast(position, rotation*CastingDirection, out hit, Mathf.Infinity, layermask))
-            {
-                zCast.transform.position = hit.point;
-                SnapCursor();
+                zCast.transform.localPosition = target_pos_right;
+                if (SnapCursor())
+                {
+                    
+                }
+                else
+                {
+                    zCast.transform.localPosition = Vector3.zero;
+                }
             }
             else
             {
-                zCast.transform.localPosition = Vector3.zero;
+
+                Vector3 cast_dir = rotation * CastingDirection;
+                RaycastHit hit;
+                if (Physics.Raycast(position, rotation*CastingDirection, out hit, Mathf.Infinity, layermask))
+                {
+                    zCast.transform.position = hit.point;
+                    SnapCursor();
+                }
+                else
+                {
+                    zCast.transform.localPosition = Vector3.zero;
+                }
             }
         }
 
     }
 
-    public void SnapCursor()
+    public bool SnapCursor()
     {
         if (isInitialized)
         {
@@ -81,7 +117,9 @@ public class PlayerController : UdonSharpBehaviour
                 zCast.transform.position = board.PosFromCoord(x, y, z, w);
                 int square = (x << 0) + (y << 2) + (z << 4) + (w << 6);
             }
+            return isValidCoord;
         }
+        return false;
     }
 
     void Start()
