@@ -90,827 +90,150 @@ public class Chess4DBoard : MonoBehaviour
 
     ///////////////////////////////////////
     ///                                 ///
-    ///           AI Control            ///
+    ///      Board Initialization       ///
     ///                                 ///
     ///////////////////////////////////////
 
-    // All methods that require ai_player to not be null to work properly
-
-    // Process a move request made by the AI. Gets called by chess4DEvalutor upon finding a move.
-    public void ProcessAIMove(int encoded_move, int turn_searching_for, bool searching_for_white)
+    // Start is called before the first frame update
+    void Start()
     {
-        // Decode the move information
-        int from = DecodeFrom(encoded_move);
-        int to = DecodeTo(encoded_move);
+        // Initialize this board first
+        InitializeBoard();
 
-        // record a boolean to tell whether our move was successful or not.
-        bool move_made = false;
-        // If we are still on the turn we queued the AI on, and the AI is searching for the correct color
-        if (turn_searching_for == turn_ai_queued && searching_for_white == queued_ai_as_white)
+        // Initialize the visualizer
+        visualizer.InitializeVisualizer();
+
+        // If we have a player controller assigned, initialize it
+        if (playerController != null)
         {
-            // If the above passed, and the AI is joined as the color its trying to make a move as
-            if ((queued_ai_as_white && IsAIWhite()) || (!queued_ai_as_white && IsAIBlack()))
-            {
-                // And the move its making is valid
-                if (IsValidMove(from, to))
-                {
-                    // And the AI is being run on the hosts client
-                    if (IsHost())
-                    {
-                        // record a succesful move
-                        move_made = true;
-                        
-                        // Make that move
-                        MakeMove(from, to);
-
-                        // And push the changes on the board to the network.
-                        PushToNetwork();
-                    }
-                    // Otherwise, tell the player the first thing that went wrong
-                    else
-                    {
-                        Debug.Log("Warning, player requesting AI move is no longer hosting");
-                    }
-                }
-                else
-                {
-                    Debug.Log("Warning, AI has chosen invalid move. If the state has not updated, then something went wrong");
-                }
-            }
-            else
-            {
-                Debug.Log("Warning, AI is trying to play when not joined as correct color");
-            }
+            playerController.InitializePlayerController(this);
         }
         else
         {
-            Debug.Log("Warning, state of game has some how changed while ai was processing");
+            Debug.Log("Warning, no player controller set");
         }
-        
-        // If we failed to make a move, put TV bot back to the neutral state and indicate he has stopped thinking.
-        // This shouldnt actually be neccesary, since anything that interrupts tv bot should also move him back to the right spot.
-        
-        // TODO: Fix potential network spam issue with this conditional statement. If TV bot gets locked into an invalid
-        // state where it thinks it can move, it could repeatable send failed move requests. SetTVBot calls PushToNetwork(),
-        // resulting in potetinal network spamming.
-        //if (!move_made)
-        //{
-        //    SetTVBot(0, false);
-        //}
 
-    }
-
-    // Add the AI in as white.
-    public void AddAIWhite()
-    {
-        // If the AI player is not null
+        // If we have an AI player, initialize it
         if (ai_player != null)
         {
-            // Add his name to white
-            white_name = "TV-Bot-9000";
-
-            // Update the displayed names
-            UpdateNames();
-
-            // Push to network
-            PushToNetwork();
+            ai_player.InitializeEvaluator(this);
         }
-    }
-
-    // See above
-    public void AddAIBlack()
-    {
-        if (ai_player != null)
-        {
-            black_name = "TV-Bot-9000";
-            UpdateNames();
-            PushToNetwork();
-        }
-    }
-
-
-
-
-    // Note that actually updating the UI text is in UI functions
-
-
-
-
-    // Determine if the AI is playing. Currently done with string name. If username TV-Bot-9000 is taken as
-    // a display name, sorry lol. You're an AI player now.
-    public bool IsAIPlaying()
-    {
-        return white_name == "TV-Bot-9000" || black_name == "TV-Bot-9000";
-    }
-
-    // Determine if the Ai is white
-    public bool IsAIWhite()
-    {
-        return white_name == "TV-Bot-9000";
-    }
-
-    // Determine if the AI is black
-    public bool IsAIBlack()
-    {
-        return black_name == "TV-Bot-9000";
-    }
-
-    // Set level of AI. No input paramters as its meant to be called from UI button events.
-
-    // If we are the master of the instance, set the ai level as desired, dispaly the level of the AI,
-    // then push our changes to the network.
-    public void SetLevel1()
-    {
-        if (Networking.IsMaster && ai_player != null)
-        {
-            AI_level = 1;
-            ai_player.SetLevel(AI_level);
-            IndicateLevel();
-            PushToNetwork();
-        }
-    }
-    public void SetLevel2()
-    {
-
-        if (Networking.IsMaster && ai_player != null)
-        {
-            AI_level = 2;
-            ai_player.SetLevel(AI_level);
-            IndicateLevel();
-            PushToNetwork();
-        }
-    }
-    public void SetLevel3()
-    {
-
-        if (Networking.IsMaster && ai_player != null)
-        {
-            AI_level = 3;
-            ai_player.SetLevel(AI_level);
-            IndicateLevel();
-            PushToNetwork();
-        }
-    }
-    public void SetLevel4()
-    {
-
-        if (Networking.IsMaster && ai_player != null)
-        {
-            AI_level = 4;
-            ai_player.SetLevel(AI_level);
-            IndicateLevel();
-            PushToNetwork();
-        }
-    }
-
-    // For each level indicator, disable the ones that are wrong, enable the right one.
-    // Handles out of bounds by terminating early, and invalid id's by disabling all.
-    public void IndicateLevel()
-    {
-        for (int i = 0; i < LevelIndicators.Length; i++)
-        {
-            LevelIndicators[i].SetActive(AI_level == i + 1);
-        }
-    }
-
-    // Set TV bot (the AI character)'s state. takes in a position 0-2 (neutral, black, white) and a thinking state.
-    // the thinking state enables a loading wheel to let the player know he is thinking.
-    public void SetTVBot(int position, bool isThinking)
-    {
-        // If tv bot exists
-        if (tv_bot != null)
-        {
-            // Encode its state
-            tv_bot_state = encode_tv_bot_state(position, isThinking);
-            
-            // pass the info onto TV bot itself
-            tv_bot.SetStateFromEncoded(tv_bot_state);
-
-            // And push to network.
-            // TODO: determine if this sometimes causes infinite looping network spam.
-            PushToNetwork();
-        }
-
-    }
-
-    // Encode tv bots state into an integer, bitwise.
-    private int encode_tv_bot_state(int position, bool isThinking)
-    {
-        int pos = position;
-        int thonk = isThinking ? 1 : 0;
-        return (pos & 3) + (thonk << 2);
-    }
-
-
-    ///////////////////////////////////////
-    ///                                 ///
-    ///           UI Methods            ///
-    ///                                 ///
-    ///////////////////////////////////////
-
-    public void UpdateNames()
-    {
-        white_field.text = white_name;
-        black_field.text = black_name;
-    }
-
-    // If we have valid text to dump our encoded history into dump the encoded history into the valid text.
-    public void PrintHistoryToLogs()
-    {
-        if (human_log != null)
-        {
-            human_log.text = encode_history_to_string(true);
-        }
-        if (comps_log != null)
-        {
-            comps_log.text = encode_history_to_string(false);
-        }
-    }
-
-    // Encode the move history into a string to be output.
-    public string encode_history_to_string(bool isHumanReadable)
-    {
-        // We'll be taking values 0-3 and converting them into something resembling chess notation. Easiest
-        // way to do this is to make looking up that input as an index return the letter we need.
-
-        // define regular letters
-        string letters = "abcd";
-
-        // define reverse letters (for disagreements between chess coordinates and my in-code board coordinates
-        string rletters = "dcba";
-
-        // define numbers for forward directions
-        string numbers = "4321";
-
-        // Define a string of piece letters to use the same trick as above, but with pieces.
-        string piece_chars = "xkqbnrpKQBNRP";
-
-        // Declare an empty string to store output into
-        string history = "";
-
-        // Copy the starting state of the board into an array so we can replay the game as we go to get what kind
-        // of piece ended up moving.
-        Array.Copy(start_state, 0, squares_buffer, 0, start_state.Length);
-        
-        // If we are outputting human readable text
-        if (isHumanReadable)
-        {
-            // For every recorded move in history
-            for (int i = 0; i < network_history.Length; i++)
-            {
-                // Get the encoded move
-                int encoded = network_history[i];
-
-                // decode the to and from coordinates
-                int from = DecodeFrom(encoded);
-                int to = DecodeTo(encoded);
-
-                // Get the components of the coordinates
-                int xf = (from >> 0) & 3;
-                int yf = (from >> 2) & 3;
-                int zf = (from >> 4) & 3;
-                int wf = (from >> 6) & 3;
-                
-                int xt = (to >> 0) & 3;
-                int yt = (to >> 2) & 3;
-                int zt = (to >> 4) & 3;
-                int wt = (to >> 6) & 3;
-
-                // Get the piece that moved, and where it's moving to
-                int pf = squares_buffer[from];
-                int pt = squares_buffer[to];
-                
-                // Update the simulated board state to keep things consistent
-                // TODO: Implement pawn promotion here. Doesnt need undo capabilities.
-                squares_buffer[to] = squares_buffer[from];
-                squares_buffer[from] = 0;
-
-                // Define a string to pad out single and double digits to match triple digit lengths
-                string digit_padding = "";
-
-                // Chess groups white / black into a single turn, so we do i / 2. Since chess is 1 indexed instead of 0 indexed, add one.
-                // If that is single digit, add a space as padding.
-                if (((i / 2) + 1) < 10)
-                {
-                    digit_padding = digit_padding + " ";
-                }
-                // If that is signle or double digit, add a nother space as padding.
-                if (((i / 2) + 1) < 100)
-                {
-                    digit_padding = digit_padding + " ";
-                }
-
-                // Calculate the white / black turn-pair we are one as a string
-                string breaker = digit_padding + ((i / 2) + 1) + ". ";
-
-                // and discard that if we are printing blacks turn, since it should already have been handled on whites
-                if (i % 2 == 1)
-                {
-                    breaker = "";
-                }
-
-                // String together the piece that moved, the piece it captured, and its from coordinate.
-                string coord1 = "" + piece_chars[pf] + piece_chars[pt] + " " + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
-                
-                // add in its to coordinate
-                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
-                
-                // add the whole thing to total history, listing the current turn number as breaker if displaying whites.
-                history = history + breaker + coord1 + " " + coord2;
-                
-                // If we are printing out a black turn, add a newline afterwards
-                if (i % 2 == 1)
-                {
-                    history = history + '\n';
-                }
-                // Otherwise, print out a slash to seperate black and whites turns.
-                else
-                {
-                    history = history + " / ";
-                }
-            }
-        }
-        // If we are not printing human readable text
         else
         {
-            // For every encoded move
-            for (int i = 0; i < network_history.Length; i++)
-            {
-                // Get the encoded move
-                int encoded = network_history[i];
-
-                // Decode its to and from coordinates
-                int from = DecodeFrom(encoded);
-                int to = DecodeTo(encoded);
-
-                // break them into components
-                int xf = (from >> 0) & 3;
-                int yf = (from >> 2) & 3;
-                int zf = (from >> 4) & 3;
-                int wf = (from >> 6) & 3;
-
-                int xt = (to >> 0) & 3;
-                int yt = (to >> 2) & 3;
-                int zt = (to >> 4) & 3;
-                int wt = (to >> 6) & 3;
-
-                // fetch the correct letters for the chess notation
-                string coord1 = "" + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
-                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
-
-                // and tack the from and to coordinates onto the history as strings
-                history = history + coord1 + coord2;
-            }
+            Debug.Log("Board has been initialized without AI player");
         }
-        // return the final history string.
-        return history;
-    }
-
-    ///////////////////////////////////////
-    ///                                 ///
-    ///      Board State Methods        ///
-    ///                                 ///
-    ///////////////////////////////////////
-
-
-    // Push board changes to the network.
-    // TODO: Try to seperate names + tv-bot status from this to reduce unnecessary network traffic.
-    public void PushToNetwork()
-    {
-        // Claim ownership of the board
-        Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
-        
-        // Set the networked history to be our current local history
-        network_history = (int[])move_history.Clone();
-
-        // print the history to logs for fun
-        PrintHistoryToLogs();
-
-        // And request serialization.
-        RequestSerialization();
     }
 
 
-    // Upon receiving new network information
-    public override void OnDeserialization()
+    public void InitializeBoard()
     {
-        // Set tv-bots state from our networked state
-        tv_bot.SetStateFromEncoded(tv_bot_state);
-        
-        // If we have an ai player
-        if (ai_player != null)
-        {
-            // indicate its networked level
-            IndicateLevel();
+        // Get some reference meshes that we use to set the piece meshes programatically
+        FillReferenceMeshes(ReferencePieces, MESH_OFFSET, MESH_COUNT);
 
-            // Set the AI itself to the correct value for any master-ship transfers.
-            ai_player.SetLevel(AI_level);
-        }
-        // Merge to the networked history
-        MergeToNetworkHistory();
+        // get some reference renderers we use to set the piece materials programatically
+        FillReferenceRenderers(ReferencePieces, RENDERER_OFFSET, RENDERER_COUNT);
 
-        // print the history to the logs
-        PrintHistoryToLogs();
+        // Find the parent object of all square game objects
+        FindAndSetSquaresRoot();
 
-        // Update the names displayed for people joined.
-        UpdateNames();
-    }
+        // Update our coordinate space so that the board can operate at arbitrary scales and rotations
+        UpdateBasis();
 
-
-    // Reset the board
-    public void ResetBoard()
-    {
-        // If a piece is currently in motion
-        if (has_target)
-        {
-            // Set its position to the position it should be in
-            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
-            old_target.transform.position = PosFromIndex(target_piece);
-        }
-        
-        // Copy the starting state into the squares array
-        Array.Copy(start_state, 0, squares, 0, squares.Length);
-
-        // Set pieces from the squares array
-        SetPiecesFromSquares();
-
-        // Clear the move history and buffer
-        move_history = new int[0];
-        move_buffer = new int[0];
-
-        // reset part of tv-bots state. Not sure what this is supposed to be as I think & 4 is incorrect.
-        // TODO: Determine correctness of "& 4"
-        tv_bot_state = (tv_bot_state & 4) + 0;
-
-        // Set tv bots state from the encoded value
-        tv_bot.SetStateFromEncoded(tv_bot_state);
-
-        // And push all the changes to the network.
-        PushToNetwork();
-    }
-
-
-    // Perform a hard sync with the last known network push
-    public void HardSync()
-    {
-        // Reset the board to its starting state
+        // Initialize the squares array that keeps track of the board state
         InitializeSquares();
+
+        // Update the pieces on the board to match the state stored in the board state array.
         SetPiecesFromSquares();
 
-        // clear the move history and buffer
-        move_history = new int[0];
-        move_buffer = new int[0];
+    }
 
-        // for every move int the networked history
-        for (int i = 0; i < network_history.Length; i++)
+
+    // Set up the reference meshes for setting piece meshes on the fly
+    void FillReferenceMeshes(GameObject ReferenceRoot, int start, int length)
+    {
+        referenceMeshes = new MeshFilter[length];
+        for (int i = 0; i < length; i++)
         {
-            // Decode the move info
-            int from = DecodeFrom(network_history[i]);
-            int to = DecodeTo(network_history[i]);
-            
-            // Apply the move (writing to history)
-            MakeMove(from, to);
-        }
-        // When finished, enforce that the move history and move buffer match the networked history. Should actually be unneccesary.
-        move_history = (int[])network_history.Clone();
-        move_buffer = (int[])network_history.Clone();
-    }
-
-
-    // Attempt to merge states with the networked history.
-    public void MergeToNetworkHistory()
-    {
-        // Figure out the latest index that both arrays agree with one another
-        int agreement = DetermineAgreement();
-
-        // Undo moves until we reached the agreement state
-        RevertBoardTo(agreement);
-
-        // While the networked move array is longer than (ahead of) our local move history
-        while (move_history.Length < network_history.Length)
-        {
-            // Keep applying moves
-            int encoded_move = network_history[move_history.Length];
-            int from = DecodeFrom(encoded_move);
-            int to = DecodeTo(encoded_move);
-            int captured = DecodeCaptured(encoded_move);
-
-            if (network_history.Length != 0)
-            {
-                MakeMove(from, to);
-            }
-        }
-    }
-    
-
-    // Determing the last time in the array the networked history agrees with the local history
-    public int DetermineAgreement()
-    {
-        int i = 0;
-        // If either history length is 0, then i < 0 will be 0 < 0, terminating early.
-        // while we still have moves in the networked and move history arrays, and the moves are the same in each, keep incrementing.
-        while ((i < move_history.Length) && (i < network_history.Length) && (move_history[i] == network_history[i])) { i++; }
-
-        // return how far we incremented
-        return i;
-    }
-
-    // Revert board to the specified turn
-    public void RevertBoardTo(int target_index)
-    {
-        // clamp the index to be a valid turn
-        int valid_index = Mathf.Clamp(target_index, 0, target_index + 1);
-        
-        // undo moves until we reach that index
-        while (move_history.Length > valid_index) { UndoMove(); }
-    }
-
-
-    // Master method for Undoing the last move, then pushing to network.
-    public void UndoMoveNetworked()
-    {
-        // If master
-        if (Networking.IsMaster)
-        {
-            // undo the last move and push to network
-            UndoMove();
-            PushToNetwork();
-        }
-    }
-
-    // Locally undo a move on the board
-    public void UndoMove()
-    {
-        // If there are moves to be undone
-        if (move_history.Length > 0)
-        {
-            // Get the last move made
-            int encoded_move = move_history[move_history.Length - 1];
-
-            // Decode its starting and ending positions, if it captured a piece, and if the piece was promoted
-            int from = DecodeFrom(encoded_move);
-            int to = DecodeTo(encoded_move);
-            int captured = DecodeCaptured(encoded_move);
-            int promoted = DecodePromoted(encoded_move);
-
-            // Unmake the move based on above information
-            UnmakeMove(from, to, captured, promoted);
-
-            // Shorten the move buffer by one move
-            move_buffer = new int[move_history.Length - 1];
-
-            // Fill the move_buffer with the move history (except the last move)
-            Array.Copy(move_history, 0, move_buffer, 0, move_buffer.Length);
-
-            // and clone the move_buffer over history, removing the last move made.
-            move_history = (int[])move_buffer.Clone();
+            referenceMeshes[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshFilter>();
         }
     }
 
 
-    // Make a move on the board
-    public void MakeMove(int from, int to)
+    // Set up reference renderers for setting up piece materials on the fly
+    void FillReferenceRenderers(GameObject ReferenceRoot, int start, int length)
     {
-        // record the piece and color of the piece we are moving
-        int piece_moved = squares[from];
-        int piece_color = PieceColor(piece_moved);
-
-        // record the piece we are capturing in case we ever need to put it back
-        int captured = squares[to];
-
-        // move the piece we are moving to its target coordinate, and clear its starting coordinate
-        squares[to] = squares[from];
-        squares[from] = 0;
-
-        // calculate the y and w coordinates to check for pawn promotion
-        int yt = (to >> 2) & 3;
-        int wt = (to >> 6) & 3;
-
-        // Determine if the piece we moved was a pawn.
-        bool isPawn = PieceTypeColorless(piece_moved) == 6;
-
-        // If the pawn is white, its promoting coord is 0. Otherwise, it is 3.
-        int target_coord = piece_color == 1 ? 0 : 3;
-        
-        // check to see the pawn is at its promoting coord along both forward directions
-        int isPromoting = (isPawn && (yt == target_coord) && (wt == target_coord)) ? 1 : 0;
-
-        // If we are promoting the piece
-        if (isPromoting == 1)
+        referenceRenderers = new MeshRenderer[length];
+        for (int i = 0; i < length; i++)
         {
-            // Set the piece to be a queen of the specified color. Note that as of right now changing
-            // colors can be accomplished by adding an offset of 6.
-            squares[to] = 2 + 6 * piece_color;
-        }
-
-        // Write our move to the networked history
-        WriteHistory(from, to, captured, isPromoting);
-
-        // Update just the to and from squares to save on performance
-        SetPieceFromSquares(from);
-        SetPieceFromSquares(to);
-
-        // If we are in the process of already moving a piece
-        if (has_target)
-        {
-            // Move that piece to where it needs to finally end up
-            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
-            old_target.transform.position = PosFromIndex(target_piece);
-        }
-        // TODO: The next few lines detail how we animate pieces. Factor this out so its easier to modify.
-        // As of right now, adding another moving piece (for reflections) is difficult because of the inflexibility.
-
-        // Set our new target piece
-        target_piece = to;
-
-        // flag that we are moving a piece
-        has_target = true;
-
-        // Grab the square gameobject of the piece we need to grab
-        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
-
-        // and move it to where it is moving from, so we can automatically move it towards its new position
-        square.transform.position = PosFromIndex(from);
-
-    }
-
-
-    // Unmake a move on the board. Basically, undo all the changes made when moving a piece
-    public void UnmakeMove(int from, int to, int captured, int promoted)
-    {
-        // Move the piece back to its starting position
-        squares[from] = squares[to];
-        if (promoted == 1)
-        {
-            // if the piece was promoted, demote it to pawn
-            int piece_color = PieceColor(squares[from]);
-            squares[from] = 6 + 6 * piece_color;
-        }
-
-        // Add the captured piece onto the square the capturing piece was
-        squares[to] = captured;
-
-        // update the to and from squares on the board
-        SetPieceFromSquares(from);
-        SetPieceFromSquares(to);
-
-        // If we are in the process of moving a piece
-        if (has_target)
-        {
-            // Set it to its final destination
-            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
-            old_target.transform.position = PosFromIndex(target_piece);
-        }
-        // Target the new piece, that should be the piece that moved on this encoded move.
-        target_piece = from;
-        has_target = true;
-
-        // and move it to where its moving from (the move's "to coordinate"), so it can be auto moved in update.
-        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
-        square.transform.position = PosFromIndex(to);
-    }
-
-    // Write a move to history by encoding it into an int, bitwise.
-    public void WriteHistory(int from, int to, int captured, int isPromoting)
-    {
-        // Increase the length of the move buffer by one
-        move_buffer = new int[move_history.Length + 1];
-
-        // copy the move history into the move_buffer
-        Array.Copy(move_history, 0, move_buffer, 0, move_history.Length);
-
-        // Add the encoded move as the final entry in the move buffer
-        move_buffer[move_buffer.Length - 1] = EncodeMove(from, to, captured, isPromoting);
-        
-        // clone the buffer over the move history
-        move_history = (int[])move_buffer.Clone();
-    }
-
-
-    ///////////////////////////////////////
-    ///                                 ///
-    ///      Networking Functions       ///
-    ///                                 ///
-    ///////////////////////////////////////
-
-
-    // Determine if we should be hosting the AI. As of right now, just check for mastership.
-    // TODO: Find a more clever way of doing this that wont break.
-    private bool IsHost()
-    {
-        return Networking.IsMaster;
-    }
-
-    // Check to see if the player is white
-    public bool IsPlayerWhite()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            return white_name == Networking.LocalPlayer.displayName;
-        }
-        return false;
-    }
-
-    // Check to see if the player is black
-    public bool IsPlayerBlack()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            return black_name == Networking.LocalPlayer.displayName;
-        }
-        return false;
-    }
-
-    // Check to see if the player is white or black
-    public bool IsPlayerJoined()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            return (black_name == Networking.LocalPlayer.displayName) || (white_name == Networking.LocalPlayer.displayName);
-        }
-        return false;
-    }
-
-    // Add the player as white
-    public void JoinAsWhite()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            // Technically tv_bot_state shouldnt be 2 (mod 4) unless tv_bot is not null, but check just in case. If the bot is in the way of white
-            if (tv_bot != null && (tv_bot_state & 3) == 2)
-            {
-                // move him out of the way.
-                tv_bot_state = (tv_bot_state & 4) + 0;
-                
-                // Update his local state (the network push comes later)
-                tv_bot.SetStateFromEncoded(tv_bot_state);
-            }
-
-            // Add the player name as white
-            white_name = Networking.LocalPlayer.displayName;
-
-            // display both names
-            UpdateNames();
-
-            // push to network
-            PushToNetwork();
+            referenceRenderers[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshRenderer>();
         }
     }
 
-    // Clear the white namefield so it is empty
-    public void ClearWhite()
+
+    // Locate and save the reference of the parent child of all square objects.
+    void FindAndSetSquaresRoot()
     {
-        if (Networking.LocalPlayer != null)
+        squares_root = this.transform.GetChild(0).gameObject;
+    }
+
+
+    // Update our coordinate space so that we can operate the board at arbitrary transforms.
+    public void UpdateBasis()
+    {
+        // so long as we have a root object to reference
+        if (BasisOrigin != null)
         {
-            // again, the state shouldnt be 2 if tv_bot is null, but just in case. If TV bot is in the way, move him
-            if (tv_bot != null && (tv_bot_state & 3) == 2)
-            {
-                
-                tv_bot_state = (tv_bot_state & 4) + 0;
-                tv_bot.SetStateFromEncoded(tv_bot_state);
-            }
+            // Get the objects transform
+            Transform t = BasisOrigin.transform;
 
-            // clear the joined as white name
-            white_name = "";
-            
-            // update the displayed names
-            UpdateNames();
+            // Set our origin for the coordinate systems
+            root = t.position;
 
-            // Push the changes to the network
-            PushToNetwork();
+            // Update our basis to its local basis
+            rt = t.right;
+            up = t.up;
+            fw = t.forward;
+
+            // Scale our offsets by its global scale
+            xy_offset = 0.0825f * t.lossyScale.z;
+            z_offset = 0.1235f * t.lossyScale.z * 1.33333333f;
+            z_scaling = 0.9f;
+            w_offset = 0.4125f * t.lossyScale.z;
+            t_offset = 1.0f * t.lossyScale.z;
+            m_offset = 2.5f * t.lossyScale.z;
+
         }
     }
 
-    // See above two methods for the next two
-    public void JoinAsBlack()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            if ((tv_bot_state & 3) == 1)
-            {
-                tv_bot_state = (tv_bot_state & 4) + 0;
-                tv_bot.SetStateFromEncoded(tv_bot_state);
-            }
-            black_name = Networking.LocalPlayer.displayName;
-            UpdateNames();
-            PushToNetwork();
-        }
-    }
-    public void ClearBlack()
-    {
-        if (Networking.LocalPlayer != null)
-        {
-            if ((tv_bot_state & 3) == 1)
-            {
-                tv_bot_state = (tv_bot_state & 4) + 0;
-                tv_bot.SetStateFromEncoded(tv_bot_state);
-            }
-            black_name = "";
-            UpdateNames();
-            PushToNetwork();
 
-        }
+    // Initialize the squares array to its starting state. Note that this is not in a very human readable format
+    void InitializeSquares()
+    {
+        squares = (int[])start_state.Clone();
     }
+
+
+    int[] start_state = new int[256] {
+                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        3, 1, 2, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        3, 2, 6, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 7, 8, 9,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 8,12, 9,
+                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11
+                                      };
+
+
+
 
 
     ///////////////////////////////////////
@@ -967,6 +290,8 @@ public class Chess4DBoard : MonoBehaviour
 
 
 
+
+
     ///////////////////////////////////////
     ///                                 ///
     ///       Game Related Logic        ///
@@ -981,6 +306,7 @@ public class Chess4DBoard : MonoBehaviour
 
 
     }
+
 
     // Handle the logic for what interacting the board should be like. Called by piece_interface, which
     // supplies its own global position as input.
@@ -1048,7 +374,7 @@ public class Chess4DBoard : MonoBehaviour
                             // If the move was valid, we have a valid network connection, and the player is joined as the right color
                             // make the move
                             MakeMove(selected_square, square);
-                            
+
                             // Clear the selected square
                             selected_square = NULL;
 
@@ -1204,12 +530,12 @@ public class Chess4DBoard : MonoBehaviour
         offsets_sorted[1] = offsets_sorted[1] >> 2;
         offsets_sorted[2] = offsets_sorted[2] >> 2;
         offsets_sorted[3] = offsets_sorted[3] >> 2;
-        
-        
+
+
         // Note that since triagonals and quadragonals must necessarily violate the forward-lateral rule, we dont need to check to see that the third-max is zero in any case
         // TODO: Add extra checks incase this rule is disabled
         // WARNING: If you have disabled my forward-lateral rule, make sure you understand and update this next section of logic
-        
+
         // Get the absolute value of the maximum offset the piece is trying to make
         int offset_length = offsets_sorted[3];
 
@@ -1225,7 +551,7 @@ public class Chess4DBoard : MonoBehaviour
 
         // setup an empty occlusion flag
         bool isOccluded = false;
-        
+
         // Cast from the starting coordinate along our scaled offsets searching for pieces that occlude its motion
         for (int i = 1; i < offset_length; i++)
         {
@@ -1234,7 +560,7 @@ public class Chess4DBoard : MonoBehaviour
             // remain on the intended path. If a diagonal is on the board, then moving along that diagonal in either direction its composed of must also be on the board. Additionally
             // we dont ever need to check the target destination, nor do we want to check the starting destination, since we know whats on either square wont occlude the move
             int piece_at = squares[CoordToIndex(xf + offset_scaled[0] * i, yf + offset_scaled[1] * i, zf + offset_scaled[2] * i, wf + offset_scaled[3] * i)];
-            
+
             // If we arent already occluded, occlude the piece if we found a square blocking it.
             isOccluded = (piece_at != 0) || isOccluded;
         }
@@ -1268,7 +594,7 @@ public class Chess4DBoard : MonoBehaviour
         {
             // again, one of these forward offsets must be zero at this point, so to get either one we can simply add them
             int forward_offset = offsets[1] + offsets[3];
-            
+
             // flip the forward direction if we are looking at white pawns
             if (color_from == 1)
             {
@@ -1292,72 +618,332 @@ public class Chess4DBoard : MonoBehaviour
     }
 
 
+
+
+
     ///////////////////////////////////////
     ///                                 ///
-    ///     Small Helper Functions      ///
+    ///      Board State Methods        ///
     ///                                 ///
     ///////////////////////////////////////
 
-    // Determines the current turn color from history length
-    public int DetermineTurnFromHistory()
+    // Push board changes to the network.
+    // TODO: Try to seperate names + tv-bot status from this to reduce unnecessary network traffic.
+    public void PushToNetwork()
     {
-        return (move_history.Length + 1) & 1;
+        // Claim ownership of the board
+        Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
+
+        // Set the networked history to be our current local history
+        network_history = (int[])move_history.Clone();
+
+        // print the history to logs for fun
+        PrintHistoryToLogs();
+
+        // And request serialization.
+        RequestSerialization();
     }
 
-    // Encodes and decodes info about a move into / from integers, bitwise. Encoding is self documenting.
-    public int EncodeMove(int from, int to, int captured, int isPromoting)
+
+    // Upon receiving new network information
+    public override void OnDeserialization()
     {
-        return ((from & 255) << 0) + ((to & 255) << 8) + ((captured & 255) << 16) + ((isPromoting & 1) << 24);
-    }
-    public int DecodeFrom(int encoded)
-    {
-        return (encoded >> 0) & 255;
-    }
-    public int DecodeTo(int encoded)
-    {
-        return (encoded >> 8) & 255;
-    }
-    public int DecodeCaptured(int encoded)
-    {
-        return (encoded >> 16) & 255;
-    }
-    public int DecodePromoted(int encoded)
-    {
-        return (encoded >> 24) & 1;
+        // Set tv-bots state from our networked state
+        tv_bot.SetStateFromEncoded(tv_bot_state);
+
+        // If we have an ai player
+        if (ai_player != null)
+        {
+            // indicate its networked level
+            IndicateLevel();
+
+            // Set the AI itself to the correct value for any master-ship transfers.
+            ai_player.SetLevel(AI_level);
+        }
+        // Merge to the networked history
+        MergeToNetworkHistory();
+
+        // print the history to the logs
+        PrintHistoryToLogs();
+
+        // Update the names displayed for people joined.
+        UpdateNames();
     }
 
-    // Calculates the index of each piece, being in array { none, king, queen, bishop, knight, rook, pawn }
-    public int PieceTypeColorless(int piece_type)
+
+    // Reset the board
+    public void ResetBoard()
     {
-        if (piece_type == 0) { return 0; }
-        return ((piece_type - 1) % 6) + 1;
+        // If a piece is currently in motion
+        if (has_target)
+        {
+            // Set its position to the position it should be in
+            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
+            old_target.transform.position = PosFromIndex(target_piece);
+        }
+
+        // Copy the starting state into the squares array
+        Array.Copy(start_state, 0, squares, 0, squares.Length);
+
+        // Set pieces from the squares array
+        SetPiecesFromSquares();
+
+        // Clear the move history and buffer
+        move_history = new int[0];
+        move_buffer = new int[0];
+
+        // reset part of tv-bots state. Not sure what this is supposed to be as I think & 4 is incorrect.
+        // TODO: Determine correctness of "& 4"
+        tv_bot_state = (tv_bot_state & 4) + 0;
+
+        // Set tv bots state from the encoded value
+        tv_bot.SetStateFromEncoded(tv_bot_state);
+
+        // And push all the changes to the network.
+        PushToNetwork();
     }
 
-    // determines if it is a black piece. Note: counts empty squares as black.
-    // Color encoding is as follows : 1-6 is black, 7-12 is white. 0 is empty but usually returns as black.
-    public bool isBlackPiece(int piece_id)
+
+    // Perform a hard sync with the last known network push
+    public void HardSync()
     {
-        return (piece_id < 7);
+        // Reset the board to its starting state
+        InitializeSquares();
+        SetPiecesFromSquares();
+
+        // clear the move history and buffer
+        move_history = new int[0];
+        move_buffer = new int[0];
+
+        // for every move int the networked history
+        for (int i = 0; i < network_history.Length; i++)
+        {
+            // Decode the move info
+            int from = DecodeFrom(network_history[i]);
+            int to = DecodeTo(network_history[i]);
+
+            // Apply the move (writing to history)
+            MakeMove(from, to);
+        }
+        // When finished, enforce that the move history and move buffer match the networked history. Should actually be unneccesary.
+        move_history = (int[])network_history.Clone();
+        move_buffer = (int[])network_history.Clone();
     }
 
-    // determine the color of the piece. Note: counts empty squares as black
-    public int PieceColor(int piece_type)
+
+    // Attempt to merge states with the networked history.
+    public void MergeToNetworkHistory()
     {
-        return piece_type / 7;
+        // Figure out the latest index that both arrays agree with one another
+        int agreement = DetermineAgreement();
+
+        // Undo moves until we reached the agreement state
+        RevertBoardTo(agreement);
+
+        // While the networked move array is longer than (ahead of) our local move history
+        while (move_history.Length < network_history.Length)
+        {
+            // Keep applying moves
+            int encoded_move = network_history[move_history.Length];
+            int from = DecodeFrom(encoded_move);
+            int to = DecodeTo(encoded_move);
+            int captured = DecodeCaptured(encoded_move);
+
+            if (network_history.Length != 0)
+            {
+                MakeMove(from, to);
+            }
+        }
     }
 
-    // Conversion between data types representing board coordinate. For this board, the coordinate is a 4-vector with values {0, 1, 2, 3}
-    // Convert a vector4 coordinate to integer index 0-255.
-    public int VectorToIndex(Vector4 coordinate)
+
+    // Determing the last time in the array the networked history agrees with the local history
+    public int DetermineAgreement()
     {
-        return Mathf.RoundToInt(Vector4.Dot(coordinate, new Vector4(1.0f, 4.0f, 16.0f, 64.0f)));
+        int i = 0;
+        // If either history length is 0, then i < 0 will be 0 < 0, terminating early.
+        // while we still have moves in the networked and move history arrays, and the moves are the same in each, keep incrementing.
+        while ((i < move_history.Length) && (i < network_history.Length) && (move_history[i] == network_history[i])) { i++; }
+
+        // return how far we incremented
+        return i;
     }
 
-    // Get and return a fresh copy of the square state. Utilized for the AI.
-    public int[] GetSquareArray()
+
+    // Revert board to the specified turn
+    public void RevertBoardTo(int target_index)
     {
-        return (int[])squares.Clone();
+        // clamp the index to be a valid turn
+        int valid_index = Mathf.Clamp(target_index, 0, target_index + 1);
+
+        // undo moves until we reach that index
+        while (move_history.Length > valid_index) { UndoMove(); }
     }
+
+
+    // Master method for Undoing the last move, then pushing to network.
+    public void UndoMoveNetworked()
+    {
+        // If master
+        if (Networking.IsMaster)
+        {
+            // undo the last move and push to network
+            UndoMove();
+            PushToNetwork();
+        }
+    }
+
+
+    // Locally undo a move on the board
+    public void UndoMove()
+    {
+        // If there are moves to be undone
+        if (move_history.Length > 0)
+        {
+            // Get the last move made
+            int encoded_move = move_history[move_history.Length - 1];
+
+            // Decode its starting and ending positions, if it captured a piece, and if the piece was promoted
+            int from = DecodeFrom(encoded_move);
+            int to = DecodeTo(encoded_move);
+            int captured = DecodeCaptured(encoded_move);
+            int promoted = DecodePromoted(encoded_move);
+
+            // Unmake the move based on above information
+            UnmakeMove(from, to, captured, promoted);
+
+            // Shorten the move buffer by one move
+            move_buffer = new int[move_history.Length - 1];
+
+            // Fill the move_buffer with the move history (except the last move)
+            Array.Copy(move_history, 0, move_buffer, 0, move_buffer.Length);
+
+            // and clone the move_buffer over history, removing the last move made.
+            move_history = (int[])move_buffer.Clone();
+        }
+    }
+
+
+    // Make a move on the board
+    public void MakeMove(int from, int to)
+    {
+        // record the piece and color of the piece we are moving
+        int piece_moved = squares[from];
+        int piece_color = PieceColor(piece_moved);
+
+        // record the piece we are capturing in case we ever need to put it back
+        int captured = squares[to];
+
+        // move the piece we are moving to its target coordinate, and clear its starting coordinate
+        squares[to] = squares[from];
+        squares[from] = 0;
+
+        // calculate the y and w coordinates to check for pawn promotion
+        int yt = (to >> 2) & 3;
+        int wt = (to >> 6) & 3;
+
+        // Determine if the piece we moved was a pawn.
+        bool isPawn = PieceTypeColorless(piece_moved) == 6;
+
+        // If the pawn is white, its promoting coord is 0. Otherwise, it is 3.
+        int target_coord = piece_color == 1 ? 0 : 3;
+
+        // check to see the pawn is at its promoting coord along both forward directions
+        int isPromoting = (isPawn && (yt == target_coord) && (wt == target_coord)) ? 1 : 0;
+
+        // If we are promoting the piece
+        if (isPromoting == 1)
+        {
+            // Set the piece to be a queen of the specified color. Note that as of right now changing
+            // colors can be accomplished by adding an offset of 6.
+            squares[to] = 2 + 6 * piece_color;
+        }
+
+        // Write our move to the networked history
+        WriteHistory(from, to, captured, isPromoting);
+
+        // Update just the to and from squares to save on performance
+        SetPieceFromSquares(from);
+        SetPieceFromSquares(to);
+
+        // If we are in the process of already moving a piece
+        if (has_target)
+        {
+            // Move that piece to where it needs to finally end up
+            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
+            old_target.transform.position = PosFromIndex(target_piece);
+        }
+        // TODO: The next few lines detail how we animate pieces. Factor this out so its easier to modify.
+        // As of right now, adding another moving piece (for reflections) is difficult because of the inflexibility.
+
+        // Set our new target piece
+        target_piece = to;
+
+        // flag that we are moving a piece
+        has_target = true;
+
+        // Grab the square gameobject of the piece we need to grab
+        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
+
+        // and move it to where it is moving from, so we can automatically move it towards its new position
+        square.transform.position = PosFromIndex(from);
+    }
+
+
+    // Unmake a move on the board. Basically, undo all the changes made when moving a piece
+    public void UnmakeMove(int from, int to, int captured, int promoted)
+    {
+        // Move the piece back to its starting position
+        squares[from] = squares[to];
+        if (promoted == 1)
+        {
+            // if the piece was promoted, demote it to pawn
+            int piece_color = PieceColor(squares[from]);
+            squares[from] = 6 + 6 * piece_color;
+        }
+
+        // Add the captured piece onto the square the capturing piece was
+        squares[to] = captured;
+
+        // update the to and from squares on the board
+        SetPieceFromSquares(from);
+        SetPieceFromSquares(to);
+
+        // If we are in the process of moving a piece
+        if (has_target)
+        {
+            // Set it to its final destination
+            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
+            old_target.transform.position = PosFromIndex(target_piece);
+        }
+        // Target the new piece, that should be the piece that moved on this encoded move.
+        target_piece = from;
+        has_target = true;
+
+        // and move it to where its moving from (the move's "to coordinate"), so it can be auto moved in update.
+        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
+        square.transform.position = PosFromIndex(to);
+    }
+
+
+    // Write a move to history by encoding it into an int, bitwise.
+    public void WriteHistory(int from, int to, int captured, int isPromoting)
+    {
+        // Increase the length of the move buffer by one
+        move_buffer = new int[move_history.Length + 1];
+
+        // copy the move history into the move_buffer
+        Array.Copy(move_history, 0, move_buffer, 0, move_history.Length);
+
+        // Add the encoded move as the final entry in the move buffer
+        move_buffer[move_buffer.Length - 1] = EncodeMove(from, to, captured, isPromoting);
+
+        // clone the buffer over the move history
+        move_history = (int[])move_buffer.Clone();
+    }
+
+
+
 
 
     ///////////////////////////////////////
@@ -1391,6 +977,7 @@ public class Chess4DBoard : MonoBehaviour
         }
     }
 
+
     // Piece setting methods.
     // Set all piece meshes and materials based on supplied integer array reference
     public void SetPiecesToState(int[] state)
@@ -1398,6 +985,7 @@ public class Chess4DBoard : MonoBehaviour
         squares = (int[])state.Clone();
         SetPiecesFromSquares();
     }
+
 
     // Set specified piece from the current squares state
     void SetPieceFromSquares(int square_index)
@@ -1411,6 +999,7 @@ public class Chess4DBoard : MonoBehaviour
         mesh_filter.sharedMesh = GetMesh(squares[square_index]);
         mesh_renderer.sharedMaterial = GetMaterial(squares[square_index]);
     }
+
 
     // Set all pieces from the current squares state
     void SetPiecesFromSquares()
@@ -1428,12 +1017,14 @@ public class Chess4DBoard : MonoBehaviour
         }
     }
 
+
     // Get the material based on the supplied piece id. Ex. if we supply a white rook, (id = 10) we will get Material 0 for black
     Material GetMaterial(int piece_id)
     {
         if (piece_id == 0) { return null; }
         return referenceRenderers[((piece_id - 1) / 6) & 1].sharedMaterial;
     }
+
 
     // Get the mesh based on the supplied piece id. Ex. if we supply a white rook, (colorless id = 5, full id = 10) we will get Mesh 4 for rook
     Mesh GetMesh(int piece_id)
@@ -1442,11 +1033,617 @@ public class Chess4DBoard : MonoBehaviour
         return referenceMeshes[((piece_id - 1) % 6)].mesh;
     }
 
+
+
+
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///           UI Methods            ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    public void UpdateNames()
+    {
+        white_field.text = white_name;
+        black_field.text = black_name;
+    }
+
+
+    // If we have valid text to dump our encoded history into dump the encoded history into the valid text.
+    public void PrintHistoryToLogs()
+    {
+        if (human_log != null)
+        {
+            human_log.text = encode_history_to_string(true);
+        }
+        if (comps_log != null)
+        {
+            comps_log.text = encode_history_to_string(false);
+        }
+    }
+
+
+    // Encode the move history into a string to be output.
+    public string encode_history_to_string(bool isHumanReadable)
+    {
+        // We'll be taking values 0-3 and converting them into something resembling chess notation. Easiest
+        // way to do this is to make looking up that input as an index return the letter we need.
+
+        // define regular letters
+        string letters = "abcd";
+
+        // define reverse letters (for disagreements between chess coordinates and my in-code board coordinates
+        string rletters = "dcba";
+
+        // define numbers for forward directions
+        string numbers = "4321";
+
+        // Define a string of piece letters to use the same trick as above, but with pieces.
+        string piece_chars = "xkqbnrpKQBNRP";
+
+        // Declare an empty string to store output into
+        string history = "";
+
+        // Copy the starting state of the board into an array so we can replay the game as we go to get what kind
+        // of piece ended up moving.
+        Array.Copy(start_state, 0, squares_buffer, 0, start_state.Length);
+
+        // If we are outputting human readable text
+        if (isHumanReadable)
+        {
+            // For every recorded move in history
+            for (int i = 0; i < network_history.Length; i++)
+            {
+                // Get the encoded move
+                int encoded = network_history[i];
+
+                // decode the to and from coordinates
+                int from = DecodeFrom(encoded);
+                int to = DecodeTo(encoded);
+
+                // Get the components of the coordinates
+                int xf = (from >> 0) & 3;
+                int yf = (from >> 2) & 3;
+                int zf = (from >> 4) & 3;
+                int wf = (from >> 6) & 3;
+
+                int xt = (to >> 0) & 3;
+                int yt = (to >> 2) & 3;
+                int zt = (to >> 4) & 3;
+                int wt = (to >> 6) & 3;
+
+                // Get the piece that moved, and where it's moving to
+                int pf = squares_buffer[from];
+                int pt = squares_buffer[to];
+
+                // Update the simulated board state to keep things consistent
+                // TODO: Implement pawn promotion here. Doesnt need undo capabilities.
+                squares_buffer[to] = squares_buffer[from];
+                squares_buffer[from] = 0;
+
+                // Define a string to pad out single and double digits to match triple digit lengths
+                string digit_padding = "";
+
+                // Chess groups white / black into a single turn, so we do i / 2. Since chess is 1 indexed instead of 0 indexed, add one.
+                // If that is single digit, add a space as padding.
+                if (((i / 2) + 1) < 10)
+                {
+                    digit_padding = digit_padding + " ";
+                }
+                // If that is signle or double digit, add a nother space as padding.
+                if (((i / 2) + 1) < 100)
+                {
+                    digit_padding = digit_padding + " ";
+                }
+
+                // Calculate the white / black turn-pair we are one as a string
+                string breaker = digit_padding + ((i / 2) + 1) + ". ";
+
+                // and discard that if we are printing blacks turn, since it should already have been handled on whites
+                if (i % 2 == 1)
+                {
+                    breaker = "";
+                }
+
+                // String together the piece that moved, the piece it captured, and its from coordinate.
+                string coord1 = "" + piece_chars[pf] + piece_chars[pt] + " " + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
+
+                // add in its to coordinate
+                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
+
+                // add the whole thing to total history, listing the current turn number as breaker if displaying whites.
+                history = history + breaker + coord1 + " " + coord2;
+
+                // If we are printing out a black turn, add a newline afterwards
+                if (i % 2 == 1)
+                {
+                    history = history + '\n';
+                }
+                // Otherwise, print out a slash to seperate black and whites turns.
+                else
+                {
+                    history = history + " / ";
+                }
+            }
+        }
+        // If we are not printing human readable text
+        else
+        {
+            // For every encoded move
+            for (int i = 0; i < network_history.Length; i++)
+            {
+                // Get the encoded move
+                int encoded = network_history[i];
+
+                // Decode its to and from coordinates
+                int from = DecodeFrom(encoded);
+                int to = DecodeTo(encoded);
+
+                // break them into components
+                int xf = (from >> 0) & 3;
+                int yf = (from >> 2) & 3;
+                int zf = (from >> 4) & 3;
+                int wf = (from >> 6) & 3;
+
+                int xt = (to >> 0) & 3;
+                int yt = (to >> 2) & 3;
+                int zt = (to >> 4) & 3;
+                int wt = (to >> 6) & 3;
+
+                // fetch the correct letters for the chess notation
+                string coord1 = "" + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
+                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
+
+                // and tack the from and to coordinates onto the history as strings
+                history = history + coord1 + coord2;
+            }
+        }
+        // return the final history string.
+        return history;
+    }
+
+
+
+
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///      Networking Functions       ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    // Determine if we should be hosting the AI. As of right now, just check for mastership.
+    // TODO: Find a more clever way of doing this that wont break.
+    private bool IsHost()
+    {
+        return Networking.IsMaster;
+    }
+
+
+    // Check to see if the player is white
+    public bool IsPlayerWhite()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            return white_name == Networking.LocalPlayer.displayName;
+        }
+        return false;
+    }
+
+
+    // Check to see if the player is black
+    public bool IsPlayerBlack()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            return black_name == Networking.LocalPlayer.displayName;
+        }
+        return false;
+    }
+
+
+    // Check to see if the player is white or black
+    public bool IsPlayerJoined()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            return (black_name == Networking.LocalPlayer.displayName) || (white_name == Networking.LocalPlayer.displayName);
+        }
+        return false;
+    }
+
+
+    // Add the player as white
+    public void JoinAsWhite()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            // Technically tv_bot_state shouldnt be 2 (mod 4) unless tv_bot is not null, but check just in case. If the bot is in the way of white
+            if (tv_bot != null && (tv_bot_state & 3) == 2)
+            {
+                // move him out of the way.
+                tv_bot_state = (tv_bot_state & 4) + 0;
+
+                // Update his local state (the network push comes later)
+                tv_bot.SetStateFromEncoded(tv_bot_state);
+            }
+
+            // Add the player name as white
+            white_name = Networking.LocalPlayer.displayName;
+
+            // display both names
+            UpdateNames();
+
+            // push to network
+            PushToNetwork();
+        }
+    }
+
+
+    // Clear the white namefield so it is empty
+    public void ClearWhite()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            // again, the state shouldnt be 2 if tv_bot is null, but just in case. If TV bot is in the way, move him
+            if (tv_bot != null && (tv_bot_state & 3) == 2)
+            {
+
+                tv_bot_state = (tv_bot_state & 4) + 0;
+                tv_bot.SetStateFromEncoded(tv_bot_state);
+            }
+
+            // clear the joined as white name
+            white_name = "";
+
+            // update the displayed names
+            UpdateNames();
+
+            // Push the changes to the network
+            PushToNetwork();
+        }
+    }
+
+
+    // See above two methods for the next two
+    public void JoinAsBlack()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            if ((tv_bot_state & 3) == 1)
+            {
+                tv_bot_state = (tv_bot_state & 4) + 0;
+                tv_bot.SetStateFromEncoded(tv_bot_state);
+            }
+            black_name = Networking.LocalPlayer.displayName;
+            UpdateNames();
+            PushToNetwork();
+        }
+    }
+
+
+    public void ClearBlack()
+    {
+        if (Networking.LocalPlayer != null)
+        {
+            if ((tv_bot_state & 3) == 1)
+            {
+                tv_bot_state = (tv_bot_state & 4) + 0;
+                tv_bot.SetStateFromEncoded(tv_bot_state);
+            }
+            black_name = "";
+            UpdateNames();
+            PushToNetwork();
+
+        }
+    }
+
+
+
+
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///           AI Control            ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    // Process a move request made by the AI. Gets called by chess4DEvalutor upon finding a move.
+    public void ProcessAIMove(int encoded_move, int turn_searching_for, bool searching_for_white)
+    {
+        // Decode the move information
+        int from = DecodeFrom(encoded_move);
+        int to = DecodeTo(encoded_move);
+
+        // record a boolean to tell whether our move was successful or not.
+        bool move_made = false;
+        // If we are still on the turn we queued the AI on, and the AI is searching for the correct color
+        if (turn_searching_for == turn_ai_queued && searching_for_white == queued_ai_as_white)
+        {
+            // If the above passed, and the AI is joined as the color its trying to make a move as
+            if ((queued_ai_as_white && IsAIWhite()) || (!queued_ai_as_white && IsAIBlack()))
+            {
+                // And the move its making is valid
+                if (IsValidMove(from, to))
+                {
+                    // And the AI is being run on the hosts client
+                    if (IsHost())
+                    {
+                        // record a succesful move
+                        move_made = true;
+                        
+                        // Make that move
+                        MakeMove(from, to);
+
+                        // And push the changes on the board to the network.
+                        PushToNetwork();
+                    }
+                    // Otherwise, tell the player the first thing that went wrong
+                    else
+                    {
+                        Debug.Log("Warning, player requesting AI move is no longer hosting");
+                    }
+                }
+                else
+                {
+                    Debug.Log("Warning, AI has chosen invalid move. If the state has not updated, then something went wrong");
+                }
+            }
+            else
+            {
+                Debug.Log("Warning, AI is trying to play when not joined as correct color");
+            }
+        }
+        else
+        {
+            Debug.Log("Warning, state of game has some how changed while ai was processing");
+        }
+        
+        // If we failed to make a move, put TV bot back to the neutral state and indicate he has stopped thinking.
+        // This shouldnt actually be neccesary, since anything that interrupts tv bot should also move him back to the right spot.
+        
+        // TODO: Fix potential network spam issue with this conditional statement. If TV bot gets locked into an invalid
+        // state where it thinks it can move, it could repeatable send failed move requests. SetTVBot calls PushToNetwork(),
+        // resulting in potetinal network spamming.
+        //if (!move_made)
+        //{
+        //    SetTVBot(0, false);
+        //}
+
+    }
+
+
+    // Add the AI in as white.
+    public void AddAIWhite()
+    {
+        // If the AI player is not null
+        if (ai_player != null)
+        {
+            // Add his name to white
+            white_name = "TV-Bot-9000";
+
+            // Update the displayed names
+            UpdateNames();
+
+            // Push to network
+            PushToNetwork();
+        }
+    }
+
+
+    // See above
+    public void AddAIBlack()
+    {
+        if (ai_player != null)
+        {
+            black_name = "TV-Bot-9000";
+            UpdateNames();
+            PushToNetwork();
+        }
+    }
+
+
+    // Determine if the AI is playing. Currently done with string name. If username TV-Bot-9000 is taken as
+    // a display name, sorry lol. You're an AI player now.
+    public bool IsAIPlaying()
+    {
+        return white_name == "TV-Bot-9000" || black_name == "TV-Bot-9000";
+    }
+
+
+    // Determine if the Ai is white
+    public bool IsAIWhite()
+    {
+        return white_name == "TV-Bot-9000";
+    }
+
+
+    // Determine if the AI is black
+    public bool IsAIBlack()
+    {
+        return black_name == "TV-Bot-9000";
+    }
+
+
+    // Set level of AI. No input paramters as its meant to be called from UI button events.
+    // If we are the master of the instance, set the ai level as desired, dispaly the level of the AI,
+    // then push our changes to the network.
+    public void SetLevel1()
+    {
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 1;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+
+
+    public void SetLevel2()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 2;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+
+
+    public void SetLevel3()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 3;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+
+
+    public void SetLevel4()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 4;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+
+
+    // For each level indicator, disable the ones that are wrong, enable the right one.
+    // Handles out of bounds by terminating early, and invalid id's by disabling all.
+    public void IndicateLevel()
+    {
+        for (int i = 0; i < LevelIndicators.Length; i++)
+        {
+            LevelIndicators[i].SetActive(AI_level == i + 1);
+        }
+    }
+
+
+    // Set TV bot (the AI character)'s state. takes in a position 0-2 (neutral, black, white) and a thinking state.
+    // the thinking state enables a loading wheel to let the player know he is thinking.
+    public void SetTVBot(int position, bool isThinking)
+    {
+        // If tv bot exists
+        if (tv_bot != null)
+        {
+            // Encode its state
+            tv_bot_state = encode_tv_bot_state(position, isThinking);
+            
+            // pass the info onto TV bot itself
+            tv_bot.SetStateFromEncoded(tv_bot_state);
+
+            // And push to network.
+            // TODO: determine if this sometimes causes infinite looping network spam.
+            PushToNetwork();
+        }
+
+    }
+
+
+    // Encode tv bots state into an integer, bitwise.
+    private int encode_tv_bot_state(int position, bool isThinking)
+    {
+        int pos = position;
+        int thonk = isThinking ? 1 : 0;
+        return (pos & 3) + (thonk << 2);
+    }
+
+
+
+
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///     Small Helper Functions      ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    // Determines the current turn color from history length
+    public int DetermineTurnFromHistory()
+    {
+        return (move_history.Length + 1) & 1;
+    }
+
+
+    // Encodes and decodes info about a move into / from integers, bitwise. Encoding is self documenting.
+    public int EncodeMove(int from, int to, int captured, int isPromoting)
+    {
+        return ((from & 255) << 0) + ((to & 255) << 8) + ((captured & 255) << 16) + ((isPromoting & 1) << 24);
+    }
+    public int DecodeFrom(int encoded)
+    {
+        return (encoded >> 0) & 255;
+    }
+    public int DecodeTo(int encoded)
+    {
+        return (encoded >> 8) & 255;
+    }
+    public int DecodeCaptured(int encoded)
+    {
+        return (encoded >> 16) & 255;
+    }
+    public int DecodePromoted(int encoded)
+    {
+        return (encoded >> 24) & 1;
+    }
+
+
+    // Calculates the index of each piece, being in array { none, king, queen, bishop, knight, rook, pawn }
+    public int PieceTypeColorless(int piece_type)
+    {
+        if (piece_type == 0) { return 0; }
+        return ((piece_type - 1) % 6) + 1;
+    }
+
+
+    // determines if it is a black piece. Note: counts empty squares as black.
+    // Color encoding is as follows : 1-6 is black, 7-12 is white. 0 is empty but usually returns as black.
+    public bool isBlackPiece(int piece_id)
+    {
+        return (piece_id < 7);
+    }
+
+
+    // determine the color of the piece. Note: counts empty squares as black
+    public int PieceColor(int piece_type)
+    {
+        return piece_type / 7;
+    }
+
+
+    // Conversion between data types representing board coordinate. For this board, the coordinate is a 4-vector with values {0, 1, 2, 3}
+    // Convert a vector4 coordinate to integer index 0-255.
+    public int VectorToIndex(Vector4 coordinate)
+    {
+        return Mathf.RoundToInt(Vector4.Dot(coordinate, new Vector4(1.0f, 4.0f, 16.0f, 64.0f)));
+    }
+    
+
+    // Get and return a fresh copy of the square state. Utilized for the AI.
+    public int[] GetSquareArray()
+    {
+        return (int[])squares.Clone();
+    }
+
+
     // Convert a 4-Vector to an index ranging 0-255
     public int CoordToIndex(int xi, int yi, int zi, int wi)
     {
         return xi + yi * 4 + zi * 16 + wi * 64;
     }
+
 
     // Convert an index ranging from 0-255 to a world space coordinate on the board
     public Vector3 PosFromIndex(int i)
@@ -1458,6 +1655,7 @@ public class Chess4DBoard : MonoBehaviour
 
         return PosFromCoord(x, y, z, w);
     }
+
 
     // Determine if a Vector-coordinate is outside the bounds of the board.
     public bool IsVectorOutOfBounds(Vector4 vector)
@@ -1578,143 +1776,6 @@ public class Chess4DBoard : MonoBehaviour
     }
 
 
-    ///////////////////////////////////////
-    ///                                 ///
-    ///      Board Initialization       ///
-    ///                                 ///
-    ///////////////////////////////////////
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        // Initialize this board first
-        InitializeBoard();
-
-        // Initialize the visualizer
-        visualizer.InitializeVisualizer();
-
-        // If we have a player controller assigned, initialize it
-        if (playerController != null)
-        {
-            playerController.InitializePlayerController(this);
-        }
-        else
-        {
-            Debug.Log("Warning, no player controller set");
-        }
-
-        // If we have an AI player, initialize it
-        if (ai_player != null)
-        {
-            ai_player.InitializeEvaluator(this);
-        }
-        else
-        {
-            Debug.Log("Board has been initialized without AI player");
-        }
-    }
-
-
-    public void InitializeBoard()
-    {
-        // Get some reference meshes that we use to set the piece meshes programatically
-        FillReferenceMeshes(ReferencePieces, MESH_OFFSET, MESH_COUNT);
-
-        // get some reference renderers we use to set the piece materials programatically
-        FillReferenceRenderers(ReferencePieces, RENDERER_OFFSET, RENDERER_COUNT);
-
-        // Find the parent object of all square game objects
-        FindAndSetSquaresRoot();
-
-        // Update our coordinate space so that the board can operate at arbitrary scales and rotations
-        UpdateBasis();
-
-        // Initialize the squares array that keeps track of the board state
-        InitializeSquares();
-
-        // Update the pieces on the board to match the state stored in the board state array.
-        SetPiecesFromSquares();
-
-    }
-
-    // Set up the reference meshes for setting piece meshes on the fly
-    void FillReferenceMeshes(GameObject ReferenceRoot, int start, int length)
-    {
-        referenceMeshes = new MeshFilter[length];
-        for (int i = 0; i < length; i++)
-        {
-            referenceMeshes[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshFilter>();
-        }
-    }
-
-    // Set up reference renderers for setting up piece materials on the fly
-    void FillReferenceRenderers(GameObject ReferenceRoot, int start, int length)
-    {
-        referenceRenderers = new MeshRenderer[length];
-        for (int i = 0; i < length; i++)
-        {
-            referenceRenderers[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshRenderer>();
-        }
-    }
-
-    // Locate and save the reference of the parent child of all square objects.
-    void FindAndSetSquaresRoot()
-    {
-        squares_root = this.transform.GetChild(0).gameObject;
-    }
-
-    // Update our coordinate space so that we can operate the board at arbitrary transforms.
-    public void UpdateBasis()
-    {
-        // so long as we have a root object to reference
-        if (BasisOrigin != null)
-        {
-            // Get the objects transform
-            Transform t = BasisOrigin.transform;
-
-            // Set our origin for the coordinate systems
-            root = t.position;
-
-            // Update our basis to its local basis
-            rt = t.right;
-            up = t.up;
-            fw = t.forward;
-
-            // Scale our offsets by its global scale
-            xy_offset = 0.0825f * t.lossyScale.z;
-            z_offset = 0.1235f * t.lossyScale.z * 1.33333333f;
-            z_scaling = 0.9f;
-            w_offset = 0.4125f * t.lossyScale.z;
-            t_offset = 1.0f * t.lossyScale.z;
-            m_offset = 2.5f * t.lossyScale.z;
-
-        }
-    }
-
-    // Initialize the squares array to its starting state. Note that this is not in a very human readable format
-    void InitializeSquares()
-    {
-        squares = (int[])start_state.Clone();
-    }
-
-    int[] start_state = new int[256] {
-                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        3, 1, 2, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        3, 2, 6, 3,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        5, 4, 4, 5,  6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        6, 6, 6, 6,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,
-                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11,
-                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 7, 8, 9,
-                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12,  9, 8,12, 9,
-                                        0, 0, 0, 0,  0, 0, 0, 0, 12,12,12,12, 11,10,10,11
-                                      };
 
 
 
@@ -1722,32 +1783,7 @@ public class Chess4DBoard : MonoBehaviour
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    // WIP Section
 
 
 
@@ -1802,6 +1838,7 @@ public class Chess4DBoard : MonoBehaviour
                                         // v
                                       };
 
+
     // Set the board state to the state defined by test_state0_transposed
     void set_test_state_transpose()
     {
@@ -1812,6 +1849,7 @@ public class Chess4DBoard : MonoBehaviour
         }
         SetPiecesToState(new_state);
     }
+
 
     int[] Transpose(int[] state, int index)
     {
@@ -1841,6 +1879,8 @@ public class Chess4DBoard : MonoBehaviour
 
         return new_state;
     }
+
+
     int[] TransposeInverse(int[] state_old, int[] state_new, int index)
     {
         int[] new_state = state_new;
