@@ -32,6 +32,7 @@ public class Chess4DEvaluator : MonoBehaviour
     public int STEPS_PER_FRAME = 8192;
     int NULL = 52;
 
+    public int NOISE_LEVEL = 52;
 
     ///////////////////////////////////////////
     ///       Memory Block Managment        ///
@@ -481,6 +482,29 @@ public class Chess4DEvaluator : MonoBehaviour
     ///             Event Calls             ///
     ///                                     ///
     ///////////////////////////////////////////
+    public void SetLevel(int i)
+    {
+        int[] levels = new int[4] { 52, 26, 13, 0 };
+        NOISE_LEVEL = levels[Mathf.Clamp(i - 1, 0, levels.Length)];
+    }
+    public void SetLevel1()
+    {
+        NOISE_LEVEL = 52;
+    }
+    public void SetLevel2()
+    {
+        NOISE_LEVEL = 26;
+    }
+    public void SetLevel3()
+    {
+        NOISE_LEVEL = 13; ;
+    }
+    public void SetLevel4()
+    {
+        NOISE_LEVEL = 0;
+    }
+
+
 
     // TODO: Make the AI use MakeMove() as this here wont be networked
     private void OnMoveFound()
@@ -703,7 +727,8 @@ public class Chess4DEvaluator : MonoBehaviour
                 // Add the current move being evaluated to the move tree
                 int move = move_buffer[current_move];
                 int value = point_table[decode_captured(move)];
-                AddChildToMoveTree(sentinal, move_buffer[current_move], (value_array[sentinal] + value) );
+                int noise = UnityEngine.Random.Range(-NOISE_LEVEL, NOISE_LEVEL);
+                AddChildToMoveTree(sentinal, move_buffer[current_move], (value_array[sentinal] + value + noise) );
 
                 // Increase the current breadth (number of nodes added), and move on to the next move (without evaluating)
                 current_breadth++;

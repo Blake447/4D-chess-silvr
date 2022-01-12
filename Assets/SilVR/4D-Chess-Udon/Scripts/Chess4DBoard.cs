@@ -12,7 +12,7 @@ public class Chess4DBoard : MonoBehaviour
 #endif
 {
     public Chess4DVisualizer visualizer;
-
+    public PlayerController playerController;
 
     public GameObject selection_cursor;
     public GameObject SquareTemplate;
@@ -39,6 +39,7 @@ public class Chess4DBoard : MonoBehaviour
 
     GameObject squares_root;
     int[] squares = new int[256];
+    int[] squares_buffer = new int[256];
 
     public GameObject BasisOrigin;
     private float xy_offset = 0.0825f;
@@ -75,10 +76,187 @@ public class Chess4DBoard : MonoBehaviour
     [UdonSynced]
     public int tv_bot_state = 0;
 
+    [UdonSynced]
+    public int AI_level = 1;
+
+    public GameObject[] LevelIndicators;
 
     public bool queued_ai_as_white = true;
     public int turn_ai_queued = 0;
 
+    public InputField human_log;
+    public InputField comps_log;
+
+
+
+
+
+
+    public void SetLevel1()
+    {
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 1;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+    public void SetLevel2()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 2;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+    public void SetLevel3()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 3;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+    public void SetLevel4()
+    {
+
+        if (Networking.IsMaster && ai_player != null)
+        {
+            AI_level = 4;
+            ai_player.SetLevel(AI_level);
+            IndicateLevel();
+            PushToNetwork();
+        }
+    }
+    public void IndicateLevel()
+    {
+        for (int i = 0; i < LevelIndicators.Length; i++)
+        {
+            LevelIndicators[i].SetActive(AI_level == i + 1);
+        }
+    }
+
+    public void PrintHistoryToLogs()
+    {
+        if (human_log != null)
+        {
+            human_log.text = encode_history_to_string(true);
+        }
+        if (comps_log != null)
+        {
+            comps_log.text = encode_history_to_string(false);
+        }
+    }
+
+
+    public string encode_history_to_string(bool isHumanReadable)
+    {
+        string letters = "abcd";
+        string rletters = "dcba";
+
+        string numbers = "4321";
+        string piece_chars = "xkqbnrpKQBNRP";
+        string p = isHumanReadable ? " " : "";
+
+        string history = "";
+
+        Array.Copy(start_state, 0, squares_buffer, 0, start_state.Length);
+        
+
+        if (isHumanReadable)
+        {
+            for (int i = 0; i < network_history.Length; i++)
+            {
+                int encoded = network_history[i];
+
+                int from = DecodeFrom(encoded);
+                int to = DecodeTo(encoded);
+
+
+                int xf = (from >> 0) & 3;
+                int yf = (from >> 2) & 3;
+                int zf = (from >> 4) & 3;
+                int wf = (from >> 6) & 3;
+
+                int xt = (to >> 0) & 3;
+                int yt = (to >> 2) & 3;
+                int zt = (to >> 4) & 3;
+                int wt = (to >> 6) & 3;
+
+                int pf = squares_buffer[from];
+                int pt = squares_buffer[to];
+                squares_buffer[to] = squares_buffer[from];
+                squares_buffer[from] = 0;
+
+
+
+                string digit_padding = "";
+                if (((i / 2) + 1) < 10)
+                {
+                    digit_padding = digit_padding + " ";
+                }
+                if (((i / 2) + 1) < 100)
+                {
+                    digit_padding = digit_padding + " ";
+                }
+
+                string breaker = digit_padding + ((i / 2) + 1) + ". ";
+                if (i % 2 == 1)
+                {
+                    breaker = "";
+                }
+
+
+                string coord1 = "" + piece_chars[pf] + piece_chars[pt] + " " + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
+                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
+                history = history + breaker + coord1 + " " + coord2;
+                
+                if (i % 2 == 1 && isHumanReadable)
+                {
+                    history = history + '\n';
+                }
+                else
+                {
+                    history = history + " / ";
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < network_history.Length; i++)
+            {
+                int encoded = network_history[i];
+
+                int from = DecodeFrom(encoded);
+                int to = DecodeTo(encoded);
+
+
+                int xf = (from >> 0) & 3;
+                int yf = (from >> 2) & 3;
+                int zf = (from >> 4) & 3;
+                int wf = (from >> 6) & 3;
+
+                int xt = (to >> 0) & 3;
+                int yt = (to >> 2) & 3;
+                int zt = (to >> 4) & 3;
+                int wt = (to >> 6) & 3;
+
+                string coord1 = "" + rletters[xf] + numbers[yf] + letters[zf] + numbers[wf];
+                string coord2 = "" + rletters[xt] + numbers[yt] + letters[zt] + numbers[wt];
+
+                history = history + coord1 + coord2;
+            }
+        }
+        
+        return history;
+    }
 
     public void SetTVBot(int position, bool isThinking)
     {
@@ -349,8 +527,31 @@ public class Chess4DBoard : MonoBehaviour
         }
     }
 
+    public void CheckForCheck(int square, int color)
+    {
 
 
+
+
+    }
+
+
+    public void HardSync()
+    {
+        InitializeSquares();
+        SetPiecesFromSquares();
+        move_history = new int[0];
+        move_buffer = new int[0];
+        for (int i = 0; i < network_history.Length; i++)
+        {
+            int from = DecodeFrom(network_history[i]);
+            int to = DecodeTo(network_history[i]);
+            MakeMove(from, to);
+        }
+        move_history = (int[])network_history.Clone();
+        move_buffer = (int[])network_history.Clone();
+
+    }
 
     public int DetermineTurnFromHistory()
     {
@@ -359,19 +560,26 @@ public class Chess4DBoard : MonoBehaviour
 
     public void UndoMoveNetworked()
     {
-        UndoMove();
-        PushToNetwork();
+        if (Networking.IsMaster)
+        {
+            UndoMove();
+            PushToNetwork();
+        }
     }
     public void PushToNetwork()
     {
         Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
         network_history = (int[])move_history.Clone();
+        PrintHistoryToLogs();
         RequestSerialization();
     }
     public override void OnDeserialization()
     {
         tv_bot.SetStateFromEncoded(tv_bot_state);
+        IndicateLevel();
+        ai_player.SetLevel(AI_level);
         MergeToNetworkHistory();
+        PrintHistoryToLogs();
         UpdateNames();
     }
     public void MergeToNetworkHistory()
@@ -444,6 +652,7 @@ public class Chess4DBoard : MonoBehaviour
         }
 
         WriteHistory(from, to, captured, isPromoting);
+
 
         SetPieceFromSquares(from);
         SetPieceFromSquares(to);
@@ -1076,7 +1285,10 @@ public class Chess4DBoard : MonoBehaviour
     {
         InitializeBoard();
         visualizer.InitializeVisualizer();
-        
+        if (playerController != null)
+        {
+            playerController.InitializePlayerController(this);
+        }
         //if (evaluator != null)
         //{
         //    evaluator.InitializeEvaluator(this);
@@ -1239,5 +1451,574 @@ public class Chess4DBoard : MonoBehaviour
 
         }
     }
+
+    // Piece Movement encoding
+
+    Vector4[] pawn_moves = new Vector4[20]
+                       {
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0,-1),
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4(-1,-1, 0, 0),
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0,-1,-1, 0),
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4(-1, 0, 0,-1),
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0,-1,-1)
+                       };
+    Vector4[] knight_moves = new Vector4[32]
+                            {
+                                    new Vector4( 1, 2, 0, 0),
+                                    new Vector4( 1,-2, 0, 0),
+                                    new Vector4(-1, 2, 0, 0),
+                                    new Vector4(-1,-2, 0, 0),
+
+                                    new Vector4( 2, 1, 0, 0),
+                                    new Vector4( 2,-1, 0, 0),
+                                    new Vector4(-2, 1, 0, 0),
+                                    new Vector4(-2,-1, 0, 0),
+
+                                    new Vector4( 1, 0, 0, 2),
+                                    new Vector4( 1, 0, 0,-2),
+                                    new Vector4(-1, 0, 0, 2),
+                                    new Vector4(-1, 0, 0,-2),
+
+                                    new Vector4( 2, 0, 0, 1),
+                                    new Vector4( 2, 0, 0,-1),
+                                    new Vector4(-2, 0, 0, 1),
+                                    new Vector4(-2, 0, 0,-1),
+
+                                    new Vector4( 0, 2, 1, 0),
+                                    new Vector4( 0, 2,-1, 0),
+                                    new Vector4( 0,-2, 1, 0),
+                                    new Vector4( 0,-2,-1, 0),
+
+                                    new Vector4( 0, 1, 2, 0),
+                                    new Vector4( 0, 1,-2, 0),
+                                    new Vector4( 0,-1, 2, 0),
+                                    new Vector4( 0,-1,-2, 0),
+
+                                    new Vector4( 0, 0, 1, 2),
+                                    new Vector4( 0, 0, 1,-2),
+                                    new Vector4( 0, 0,-1,-2),
+                                    new Vector4( 0, 0, 1,-2),
+
+                                    new Vector4( 0, 0, 2, 1),
+                                    new Vector4( 0, 0, 2,-1),
+                                    new Vector4( 0, 0,-2, 1),
+                                    new Vector4( 0, 0,-2,-1)
+
+
+                            };
+    Vector4[] rook_moves = new Vector4[24]
+                            {
+                                    new Vector4( 1, 0, 0, 0),
+                                    new Vector4( 2, 0, 0, 0),
+                                    new Vector4( 3, 0, 0, 0),
+                                    new Vector4(-1, 0, 0, 0),
+                                    new Vector4(-2, 0, 0, 0),
+                                    new Vector4(-3, 0, 0, 0),
+
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0, 2, 0, 0),
+                                    new Vector4( 0, 3, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+                                    new Vector4( 0,-2, 0, 0),
+                                    new Vector4( 0,-3, 0, 0),
+
+                                    new Vector4( 0, 0, 1, 0),
+                                    new Vector4( 0, 0, 2, 0),
+                                    new Vector4( 0, 0, 3, 0),
+                                    new Vector4( 0, 0,-1, 0),
+                                    new Vector4( 0, 0,-2, 0),
+                                    new Vector4( 0, 0,-3, 0),
+
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0, 2),
+                                    new Vector4( 0, 0, 0, 3),
+                                    new Vector4( 0, 0, 0,-1),
+                                    new Vector4( 0, 0, 0,-2),
+                                    new Vector4( 0, 0, 0,-3)
+                            };
+    Vector4[] bishop_moves = new Vector4[48]
+                        {
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4( 2, 2, 0, 0),
+                                    new Vector4( 3, 3, 0, 0),
+
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4(-2, 2, 0, 0),
+                                    new Vector4(-3, 3, 0, 0),
+
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4( 2,-2, 0, 0),
+                                    new Vector4( 3,-3, 0, 0),
+
+                                    new Vector4(-1,-1, 0, 0),
+                                    new Vector4(-2,-2, 0, 0),
+                                    new Vector4(-3,-3, 0, 0),
+
+
+
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4( 2, 0, 0, 2),
+                                    new Vector4( 3, 0, 0, 3),
+
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4(-2, 0, 0, 2),
+                                    new Vector4(-3, 0, 0, 3),
+
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4( 2, 0, 0,-2),
+                                    new Vector4( 3, 0, 0,-3),
+
+                                    new Vector4(-1, 0, 0,-1),
+                                    new Vector4(-2, 0, 0,-2),
+                                    new Vector4(-3, 0, 0,-3),
+
+
+
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0, 2, 2, 0),
+                                    new Vector4( 0, 3, 3, 0),
+
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0,-2, 2, 0),
+                                    new Vector4( 0,-3, 3, 0),
+
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0, 2,-2, 0),
+                                    new Vector4( 0, 3,-3, 0),
+
+                                    new Vector4( 0,-1,-1, 0),
+                                    new Vector4( 0,-2,-2, 0),
+                                    new Vector4( 0,-3,-3, 0),
+
+
+
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0, 2, 2),
+                                    new Vector4( 0, 0, 3, 3),
+
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0,-2, 2),
+                                    new Vector4( 0, 0,-3, 3),
+
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0, 2,-2),
+                                    new Vector4( 0, 0, 3,-3),
+
+                                    new Vector4( 0, 0,-1,-1),
+                                    new Vector4( 0, 0,-2,-2),
+                                    new Vector4( 0, 0,-3,-3)
+                        };
+    Vector4[] king_moves = new Vector4[24]
+                        {
+                                    new Vector4( 1, 0, 0, 0),
+                                    new Vector4(-1, 0, 0, 0),
+
+                                    new Vector4( 0, 1, 0, 0),
+                                    new Vector4( 0,-1, 0, 0),
+
+                                    new Vector4( 0, 0, 1, 0),
+                                    new Vector4( 0, 0,-1, 0),
+
+                                    new Vector4( 0, 0, 0, 1),
+                                    new Vector4( 0, 0, 0,-1),
+
+                                    new Vector4( 1, 1, 0, 0),
+                                    new Vector4(-1, 1, 0, 0),
+                                    new Vector4( 1,-1, 0, 0),
+                                    new Vector4(-1,-1, 0, 0),
+
+                                    new Vector4( 1, 0, 0, 1),
+                                    new Vector4(-1, 0, 0, 1),
+                                    new Vector4( 1, 0, 0,-1),
+                                    new Vector4(-1, 0, 0,-1),
+
+                                    new Vector4( 0, 1, 1, 0),
+                                    new Vector4( 0,-1, 1, 0),
+                                    new Vector4( 0, 1,-1, 0),
+                                    new Vector4( 0,-1,-1, 0),
+
+                                    new Vector4( 0, 0, 1, 1),
+                                    new Vector4( 0, 0,-1, 1),
+                                    new Vector4( 0, 0, 1,-1),
+                                    new Vector4( 0, 0,-1,-1),
+                        };
+
+
+
+
+
+
+
+    // HEAVY logic stuff
+    public GameObject CheckRequestCursor;
+
+
+    public int[] move_array = new int[256];
+    int move_count = 0;
+    public int[] board_buffer0 = new int[256];
+    int bbCount0 = 0;
+
+    public void SendCheckRequestWhite()
+    {
+        SendCheckRequest(CheckRequestCursor.transform.position, 1);
+    }
+
+
+    public void SendCheckRequest(Vector3 position, int color)
+    {
+        Vector4 coord = SnapToCoordinateVerbose(position);
+        bool isValidCoord = !IsVectorOutOfBounds(coord);
+        LoadBoardBuffer(VectorToIndex(coord), color);
+        Debug.Log("Board buffer has been filled");
+        PrintMoveArray();
+    }
+
+   
+
+    public void PrintMoveArray()
+    {
+        for (int i = 0; i < move_count; i++)
+        {
+            int target_index = DecodeTo(move_array[i]);
+            int x = (target_index >> 0) & 3;
+            int y = (target_index >> 2) & 3;
+            int z = (target_index >> 4) & 3;
+            int w = (target_index >> 6) & 3;
+
+            
+
+
+            Debug.Log("Piece " + board_buffer0[target_index] + " found at "+ "search coord: (" + x + ", " + y + ", " + z + ", " + w + ")");
+        }
+    }
+
+    // Encodes info about moves into an integer for easier storage and manipulation
+    // first 8 bits are starting square, next 8 are target square, and after that is the piece it captured (including 0 = empty)
+    public int encode_movement(int from, int to, int piece_captured)
+    {
+        return ((from & 255) << 0) + ((to & 255) << 8) + ((piece_captured & 255) << 16);
+    }
+
+    // extract and return the bits in which the starting square of a movement are encoded into
+    public int decode_from(int movement)
+    {
+        return ((movement >> 0) & 255);
+    }
+
+    // extract and return the bits in which the landing square of a movement are encoded into
+    public int decode_to(int movement)
+    {
+        return ((movement >> 8) & 255);
+    }
+
+    // extract and return the bits in which the captured piece of a movement are encoded into
+    public int decode_captured(int movement)
+    {
+        return ((movement >> 16) & 255);
+    }
+
+    private void ClearMoveBuffer()
+    {
+        move_count = 0;
+    }
+
+    private void FillMoveBuffer(int[] state, int square)
+    {
+        //pieces_count = 0;
+
+        move_count = 0;
+        move_array[0] = NULL;
+
+
+        int piece = state[square];
+        int piece_type = PieceTypeColorless(piece);
+        int piece_color = PieceColor(piece);
+
+        int px = (square >> 0) & 3;
+        int py = (square >> 2) & 3;
+        int pz = (square >> 4) & 3;
+        int pw = (square >> 6) & 3;
+        int target_index = 0;
+
+        int sx = px;
+        int sy = py;
+        int sz = pz;
+        int sw = pw;
+
+        if (piece_type == 1)
+        {
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 24; i++)
+            {
+                sv = pv + king_moves[i];
+                if (!IsVectorOutOfBounds(sv))
+                {
+                    target_index = VectorToIndex(sv);
+                    int result = state[target_index];
+                    if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
+                    {
+                        int encoded_movement = encode_movement(square, target_index, result);
+                        move_array[move_count] = encoded_movement;
+                        move_count++;
+                    }
+                }
+            }
+
+
+            //int stop_watch_end = GetTime();
+            //time_spent_kings += (stop_watch_end - stop_watch_start);
+        }
+        else if (piece_type == 2)
+        {
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 48; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + bishop_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_array[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
+                                move_array[move_count] = encoded_movement;
+                                move_count++;
+                            }
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+            for (int i = 0; i < 24; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + rook_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_array[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
+                                move_array[move_count] = encoded_movement;
+                                move_count++;
+                            }
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_queens += (stop_watch_end - stop_watch_start);
+        }
+        else if (piece_type == 3)
+        {
+            //int stop_watch_start = GetTime();
+
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 48; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + bishop_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_array[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
+                                move_array[move_count] = encoded_movement;
+                                move_count++;
+                            }
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_bishops += (stop_watch_end - stop_watch_start);
+        }
+        else if (piece_type == 4)
+        {
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+
+            for (int i = 0; i < 32; i++)
+            {
+                sv = pv + knight_moves[i];
+                if (!IsVectorOutOfBounds(sv))
+                {
+                    target_index = VectorToIndex(sv);
+                    int result = state[target_index];
+                    if (result == 0 || isBlackPiece(result) != isBlackPiece(piece))
+                    {
+                        // Note, all encoded movments MUST be valid, otherwise the tree walk for evaluating moves may break
+                        int encoded_movement = encode_movement(square, target_index, result);
+                        move_array[move_count] = encoded_movement;
+                        move_count++;
+                    }
+                }
+            }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_knights += (stop_watch_end - stop_watch_start);
+        }
+        else if (piece_type == 5)
+        {
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+            for (int i = 0; i < 24; i += 3)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    sv = pv + rook_moves[i + j];
+                    if (!IsVectorOutOfBounds(sv))
+                    {
+                        target_index = VectorToIndex(sv);
+                        int result = state[target_index];
+                        if (result == 0)
+                        {
+                            int encoded_movement = encode_movement(square, target_index, result);
+                            move_array[move_count] = encoded_movement;
+                            move_count++;
+                        }
+                        else
+                        {
+                            if (isBlackPiece(result) != isBlackPiece(piece))
+                            {
+                                int encoded_movement = encode_movement(square, target_index, result);
+                                move_array[move_count] = encoded_movement;
+                                move_count++;
+                            }
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
+
+            //int stop_watch_end = GetTime();
+            //time_spent_rooks += (stop_watch_end - stop_watch_start);
+        }
+        else if (piece_type == 6)
+        {
+            //int stop_watch_start = GetTime();
+
+            Vector4 pv = new Vector4(px, py, pz, pw);
+            Vector4 sv;
+
+            for (int i = 0; i < 2; i++)
+            {
+                sv = pv + pawn_moves[2 * i + piece_color];
+
+                target_index = VectorToIndex(sv);
+                if (!IsVectorOutOfBounds(sv) && state[target_index] == 0)
+                {
+                    int encoded_movement = encode_movement(square, target_index, state[target_index]);
+                    move_array[move_count] = encoded_movement;
+                    move_count++;
+                }
+            }
+
+            for (int i = 2; i < 10; i++)
+            {
+                sv = pv + pawn_moves[2 * i + piece_color];
+                target_index = VectorToIndex(sv);
+                if (!IsVectorOutOfBounds(sv) && state[target_index] != 0 && isBlackPiece(state[target_index]) != isBlackPiece(piece))
+                {
+                    move_array[move_count] = encode_movement(square, target_index, state[target_index]);
+                    move_count++;
+                }
+            }
+
+            //int stop_watch_end = GetTime();
+            //time_spent_pawns += (stop_watch_end - stop_watch_start);
+        }
+    }
+
+
+    public void LoadBoardBuffer(int local_square, int color)
+    {
+        Array.Copy(squares, 0, board_buffer0, 0, squares.Length);
+        board_buffer0[local_square] = 2 + 6 * color;
+        FillMoveBuffer(board_buffer0, local_square);
+    }
+
+
+
+
 
 }

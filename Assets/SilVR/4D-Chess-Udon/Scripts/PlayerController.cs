@@ -59,11 +59,11 @@ public class PlayerController : UdonSharpBehaviour
             {
                 Vector3 hand_pos_right = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
                 Quaternion hand_rot_right = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
-                Vector3 target_pos_right = hand_pos_right + hand_rot_right * new Vector3(0.025f, 0.0f, 0.025f); ;
+                Vector3 target_pos_right = hand_pos_right + hand_rot_right * new Vector3(0.030f, 0.0f, 0.030f); ;
 
                 Vector3 hand_pos_left = player.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).position;
                 Quaternion hand_rot_left = player.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).rotation;
-                Vector3 target_pos_left = hand_pos_left + hand_rot_left * new Vector3(0.025f, 0.0f, 0.025f);
+                Vector3 target_pos_left = hand_pos_left + hand_rot_left * new Vector3(0.030f, 0.0f, 0.030f);
 
                 position = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
                 rotation = player.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
@@ -73,14 +73,13 @@ public class PlayerController : UdonSharpBehaviour
                 offset = fing_pos - hand_pos;
 
                 zCast.transform.localPosition = target_pos_right;
-                if (SnapCursor())
-                {
-                    
-                }
-                else
+                zCast.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
+                //SnapCursor();
+                if (!SnapCursor())
                 {
                     zCast.transform.localPosition = Vector3.zero;
                 }
+                zCast.transform.position += new Vector3(0.0f, 0.0325f, 0.0f);
             }
             else
             {
@@ -90,7 +89,7 @@ public class PlayerController : UdonSharpBehaviour
                 if (Physics.Raycast(position, rotation*CastingDirection, out hit, Mathf.Infinity, layermask))
                 {
                     zCast.transform.position = hit.point;
-                    SnapCursor();
+                    //SnapCursor();
                 }
                 else
                 {

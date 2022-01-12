@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: TVBotRig
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 0be5858d4180aa84b85d25b5f3e171ca,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 922a4db2dd6be1046915453b2c712f8e,
     type: 2}
   udonAssembly: 
   assemblyError: 

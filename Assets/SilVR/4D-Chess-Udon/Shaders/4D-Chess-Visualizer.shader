@@ -8,6 +8,9 @@
         _CursorScale("Cursor Scale", float) = 1.0
         _CursorHeight("Cursor Height", float) = 1.0
         _Coordinate("Coordinate", Vector) = (0,0,0,0)
+        _ColorMove("Move indicator color", Color) = (0, 1, 0, 1)
+        _ColorTake("cap with pawn color", Color) = (0.6, 0.0, 0.2, 1)
+
 
     }
     SubShader
@@ -47,6 +50,9 @@
             float _CursorHeight;
             float4 _Coordinate;
 
+
+            float4 _ColorMove;
+            float4 _ColorTake;
             v2f vert (appdata v)
             {
                 int4 root_coordinate = floor(_Coordinate + float4(8.5, 8.5, 8.5, 8.5));
@@ -114,13 +120,15 @@
                 return o;
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            fixed4 frag(v2f i) : SV_Target
             {
+                float4 interpolation = lerp(_ColorMove, _ColorTake, step(0.5, i.uv.x));
+
                 // sample the texture
                 fixed4 col = tex2D(_MainTex, i.uv);
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, col);
-                return float4(1, 0, 1, 1);
+                return interpolation;
             }
             ENDCG
         }
