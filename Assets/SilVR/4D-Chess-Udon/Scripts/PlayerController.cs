@@ -9,8 +9,8 @@ public class PlayerController : UdonSharpBehaviour
     Chess4DBoard board;
     
     bool isInitialized = false;
-    public GameObject zCast;
-
+    public GameObject zCast_right;
+    public GameObject zCast_left;
     public void InitializePlayerController(Chess4DBoard init_board)
     {
         board = init_board;
@@ -72,14 +72,24 @@ public class PlayerController : UdonSharpBehaviour
                 Vector3 fing_pos = player.GetBonePosition(HumanBodyBones.RightIndexProximal);
                 offset = fing_pos - hand_pos;
 
-                zCast.transform.localPosition = target_pos_right;
-                zCast.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
+                zCast_left.transform.localPosition = target_pos_left;
+                zCast_left.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
                 //SnapCursor();
-                if (!SnapCursor())
+                if (!SnapCursor(zCast_left))
                 {
-                    zCast.transform.localPosition = Vector3.zero;
+                    zCast_left.transform.localPosition = Vector3.zero;
                 }
-                zCast.transform.position += new Vector3(0.0f, 0.0325f, 0.0f);
+                zCast_left.transform.position += new Vector3(0.0f, 0.0325f, 0.0f);
+
+
+                zCast_right.transform.localPosition = target_pos_right;
+                zCast_right.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
+                //SnapCursor();
+                if (!SnapCursor(zCast_right))
+                {
+                    zCast_right.transform.localPosition = Vector3.zero;
+                }
+                zCast_right.transform.position += new Vector3(0.0f, 0.0325f, 0.0f);
             }
             else
             {
@@ -88,23 +98,23 @@ public class PlayerController : UdonSharpBehaviour
                 RaycastHit hit;
                 if (Physics.Raycast(position, rotation*CastingDirection, out hit, Mathf.Infinity, layermask))
                 {
-                    zCast.transform.position = hit.point;
+                    zCast_right.transform.position = hit.point;
                     //SnapCursor();
                 }
                 else
                 {
-                    zCast.transform.localPosition = Vector3.zero;
+                    zCast_right.transform.localPosition = Vector3.zero;
                 }
             }
         }
 
     }
 
-    public bool SnapCursor()
+    public bool SnapCursor(GameObject cursor)
     {
         if (isInitialized)
         {
-            Vector4 coordinate = board.SnapToCoordinateVerbose(zCast.transform.position);
+            Vector4 coordinate = board.SnapToCoordinateVerbose(cursor.transform.position);
             bool isValidCoord = (!board.IsVectorOutOfBounds(coordinate));
             int x = Mathf.RoundToInt(coordinate.x);
             int y = Mathf.RoundToInt(coordinate.y);
@@ -113,7 +123,7 @@ public class PlayerController : UdonSharpBehaviour
 
             if (isValidCoord)
             {
-                zCast.transform.position = board.PosFromCoord(x, y, z, w);
+                cursor.transform.position = board.PosFromCoord(x, y, z, w);
                 int square = (x << 0) + (y << 2) + (z << 4) + (w << 6);
             }
             return isValidCoord;

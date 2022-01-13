@@ -11,21 +11,24 @@ public class Chess4DBoard : UdonSharpBehaviour
 public class Chess4DBoard : MonoBehaviour
 #endif
 {
-    public Chess4DVisualizer visualizer;
     public PlayerController playerController;
+    public Chess4DEvaluator ai_player;
 
+    public Chess4DVisualizer visualizer;
     public GameObject selection_cursor;
     public GameObject SquareTemplate;
-
-    public GameObject ReferencePieces;
-    public MeshFilter[] referenceMeshes;
-    public MeshRenderer[] referenceRenderers;
-
-    public Chess4DEvaluator ai_player;
     public TVBotRig tv_bot;
+    public GameObject piece_arrow;
+    public GameObject turn_indicator_white;
+    public GameObject turn_indicator_black;
 
+
+
+    public GameObject[] LevelIndicators;
     public Text white_field;
     public Text black_field;
+    public InputField human_log;
+    public InputField comps_log;
 
     int MESH_OFFSET = 0;
     int MESH_COUNT = 6;
@@ -36,6 +39,9 @@ public class Chess4DBoard : MonoBehaviour
     int NULL = 1024;
     int selected_square = 1024;
 
+    public GameObject ReferencePieces;
+    public MeshFilter[] referenceMeshes;
+    public MeshRenderer[] referenceRenderers;
 
     GameObject squares_root;
     int[] squares = new int[256];
@@ -79,13 +85,61 @@ public class Chess4DBoard : MonoBehaviour
     [UdonSynced]
     public int AI_level = 1;
 
-    public GameObject[] LevelIndicators;
 
     public bool queued_ai_as_white = true;
     public int turn_ai_queued = 0;
 
-    public InputField human_log;
-    public InputField comps_log;
+
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///         Gizmo Control           ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    public void SetTurnIndicator()
+    {
+        int color = DetermineTurnFromHistory();
+        turn_indicator_white.SetActive(color == 1);
+        turn_indicator_black.SetActive(color == 0);
+    }
+
+    public void SetArrow(GameObject arrow, int from, int to)
+    {
+        arrow.transform.position = PosFromIndex(from) + Vector3.up * z_offset * 0.125f;
+        PointArrow(arrow, PosFromIndex(to) + Vector3.up * z_offset * 0.125f);
+    }
+
+    public void ResetArrow(GameObject arrow)
+    {
+        arrow.SetActive(false);
+    }
+
+    public void PointArrow(GameObject arrow, Vector3 target)
+    {
+        float main_scale = this.gameObject.transform.lossyScale.x;
+
+        arrow.SetActive(true);
+
+        Vector3 offset = (target - arrow.transform.position);
+        float distance = (offset.magnitude - xy_offset*0.5f) * 2 / main_scale;
+
+        Quaternion rotation = Quaternion.LookRotation(offset.normalized, Vector3.up);
+
+        arrow.transform.rotation = rotation;
+        GameObject arrow_stem = arrow.transform.GetChild(0).gameObject;
+        GameObject arrow_tip = arrow.transform.GetChild(1).gameObject;
+
+        if (arrow_stem != null)
+        {
+            arrow_stem.transform.localScale = new Vector3(25, 25 * (distance * 4.0f), 25);
+        }
+        if (arrow_tip != null)
+        {
+            arrow_tip.transform.localPosition = Vector3.forward * distance;
+        }
+    }
+
 
 
     ///////////////////////////////////////
@@ -286,6 +340,10 @@ public class Chess4DBoard : MonoBehaviour
             // and move it towards where it should be.
             square.transform.position = new_pos;
         }
+
+        // Set the turn indicator to show whos turn it is to play.
+        // TODO: Get this out of update function
+        SetTurnIndicator();
     }
 
 
@@ -410,6 +468,19 @@ public class Chess4DBoard : MonoBehaviour
             selected_square = NULL;
             visualizer.SetVisualizerState(coord, 0, 0);
         }
+
+        if (selected_square != NULL)
+        {
+            selection_cursor.SetActive(true);
+            selection_cursor.transform.position = PosFromIndex(selected_square);
+        }
+        else
+        {
+            selection_cursor.SetActive(false);
+        }
+
+
+
 
     }
 
@@ -627,6 +698,12 @@ public class Chess4DBoard : MonoBehaviour
     ///                                 ///
     ///////////////////////////////////////
 
+
+    public void ForcePushToNetwork()
+    {
+        PushToNetwork();
+    }
+
     // Push board changes to the network.
     // TODO: Try to seperate names + tv-bot status from this to reduce unnecessary network traffic.
     public void PushToNetwork()
@@ -701,6 +778,8 @@ public class Chess4DBoard : MonoBehaviour
 
         // And push all the changes to the network.
         PushToNetwork();
+
+        ResetArrow(piece_arrow);
     }
 
 
@@ -821,6 +900,18 @@ public class Chess4DBoard : MonoBehaviour
             // and clone the move_buffer over history, removing the last move made.
             move_history = (int[])move_buffer.Clone();
         }
+        if (move_history.Length > 0)
+        {
+            int move = move_history[move_history.Length - 1];
+            int from = DecodeFrom(move);
+            int to = DecodeTo(move);
+            SetArrow(piece_arrow, from, to);
+        }
+        else
+        {
+            ResetArrow(piece_arrow);
+        }
+
     }
 
 
@@ -865,6 +956,8 @@ public class Chess4DBoard : MonoBehaviour
         // Update just the to and from squares to save on performance
         SetPieceFromSquares(from);
         SetPieceFromSquares(to);
+
+        SetArrow(piece_arrow, from, to);
 
         // If we are in the process of already moving a piece
         if (has_target)
