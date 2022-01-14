@@ -363,24 +363,6 @@ public class Chess4DEvaluator : MonoBehaviour
     {
         0, -100001, -50, -30, -10, -40, -5, 100000, 50, 30, 10, 40, 5
     };
-
-    ///////////////////////////////////////////
-    ///                                     ///
-    ///     Simple Array Manipulations      ///
-    ///                                     ///
-    ///////////////////////////////////////////
-
-    // Simple array manipulation for various arrays of fixed length used in the program.
-
-    // All of these arrays are of fixed size, but can only be as large as the board itself. We allocate a spot for
-    // every square on the board, then simply keep track of how many objects we are meaningfully storing in there.
-
-    // to add a piece to the buffer, we'll simply place it into the next spot, and add to the count of the pieces
-    // to "clear" out a buffer, there's no need to actually clear data, we just need to set the count to 0.
-
-    // note this means all piece count variables global references
-
-
     public void QueueMove(int turn, bool isWhite)
     {
         turn_queued_on = turn;
@@ -419,6 +401,24 @@ public class Chess4DEvaluator : MonoBehaviour
 
         }
     }
+
+    ///////////////////////////////////////////
+    ///                                     ///
+    ///     Simple Array Manipulations      ///
+    ///                                     ///
+    ///////////////////////////////////////////
+
+    // Simple array manipulation for various arrays of fixed length used in the program.
+
+    // All of these arrays are of fixed size, but can only be as large as the board itself. We allocate a spot for
+    // every square on the board, then simply keep track of how many objects we are meaningfully storing in there.
+
+    // to add a piece to the buffer, we'll simply place it into the next spot, and add to the count of the pieces
+    // to "clear" out a buffer, there's no need to actually clear data, we just need to set the count to 0.
+
+    // note this means all piece count variables global references
+
+
 
     // Adding and clearing methods for the move buffer. Stores possible moves as encoded values (not node adresses)
     private void AddMoveToBuffer(int move)

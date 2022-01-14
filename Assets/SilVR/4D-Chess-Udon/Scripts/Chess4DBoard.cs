@@ -69,7 +69,7 @@ public class Chess4DBoard : MonoBehaviour
 
     [UdonSynced]
     public int[] network_history;
-    
+
     public int[] move_history;
     public int[] move_buffer;
 
@@ -89,6 +89,60 @@ public class Chess4DBoard : MonoBehaviour
     public bool queued_ai_as_white = true;
     public int turn_ai_queued = 0;
 
+    int[] target_squares = new int[8];
+    int target_squares_count = 0;
+
+    GameObject[] target_objects = new GameObject[8];
+    Vector3[] target_vectors = new Vector3[8];
+    bool[] target_flags = new bool[8];
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///        Animating Pieces         ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    GameObject FetchGameobjectsChild(GameObject root, int square)
+    {
+        return root.transform.GetChild(square).gameObject;
+    }
+
+    public void InitializeTargets()
+    {
+        for (int i = 0; i < target_squares.Length; i++)
+        {
+            target_squares[i] = NULL;
+            target_flags[i] = false;
+        }
+    }
+    public void AddTarget(int target_index, int square, GameObject target_object)
+    {
+        if ( target_flags[target_index] )
+        {
+            target_objects[target_index].transform.position = target_vectors[target_index];
+        }
+
+        target_objects[target_index] = target_object;
+        target_squares[target_index] = square;
+        target_vectors[target_index] = PosFromIndex(square);
+        target_flags[target_index] = true;
+    }
+    public void ClearTarget(int target_index)
+    {
+        target_squares[target_index] = NULL;
+        target_flags[target_index] = false;
+    }
+    public void UpdateTarget(int target_index, float speed)
+    {
+        target_objects[target_index].transform.position = Vector3.MoveTowards(target_objects[target_index].transform.position, target_vectors[target_index], speed);
+    }
+    public void UpdateTargetIfNotNull(int target_index, float speed)
+    {
+        if (target_flags[target_index])
+        {
+            target_objects[target_index].transform.position = Vector3.MoveTowards(target_objects[target_index].transform.position, target_vectors[target_index], speed);
+        }
+    }
 
 
     ///////////////////////////////////////
@@ -176,6 +230,9 @@ public class Chess4DBoard : MonoBehaviour
         {
             Debug.Log("Board has been initialized without AI player");
         }
+
+        // Initialize Targets for animating pieces
+        InitializeTargets();
     }
 
 
@@ -327,19 +384,9 @@ public class Chess4DBoard : MonoBehaviour
             }
         }
 
-        // Handle the actual moving of the pieces. We move pieces by selecting a target piece. The target piece then automatically moves back
-        // towards its original position
-        if (has_target)
-        {
-            // Get the piece that our target index points to
-            GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
-
-            // Calculate its new position
-            Vector3 new_pos = Vector3.MoveTowards(square.transform.position, PosFromIndex(target_piece), move_speed * (Time.deltaTime));
-
-            // and move it towards where it should be.
-            square.transform.position = new_pos;
-        }
+        // Move the target piece towards its target position, if its not null.
+        // 0 specifices the first target, and move speed sets how far to move the piece per frame.
+        UpdateTargetIfNotNull(0, move_speed * Time.deltaTime);
 
         // Set the turn indicator to show whos turn it is to play.
         // TODO: Get this out of update function
@@ -959,21 +1006,9 @@ public class Chess4DBoard : MonoBehaviour
 
         SetArrow(piece_arrow, from, to);
 
-        // If we are in the process of already moving a piece
-        if (has_target)
-        {
-            // Move that piece to where it needs to finally end up
-            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
-            old_target.transform.position = PosFromIndex(target_piece);
-        }
-        // TODO: The next few lines detail how we animate pieces. Factor this out so its easier to modify.
-        // As of right now, adding another moving piece (for reflections) is difficult because of the inflexibility.
-
         // Set our new target piece
         target_piece = to;
-
-        // flag that we are moving a piece
-        has_target = true;
+        AddTarget(0, to, FetchGameobjectsChild(squares_root, to));
 
         // Grab the square gameobject of the piece we need to grab
         GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
