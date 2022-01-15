@@ -121,6 +121,26 @@ public class Chess4DBoard : MonoBehaviour
     ///                                 ///
     ///////////////////////////////////////
 
+    public void LoadReferenceSets()
+    {
+        FillReferenceSet(ref_meshes_00, ref_mats_00, squares_root);
+    }
+
+    public void SetBoardState(int[] state)
+    {
+        squares = (int[])state.Clone();
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+    }
+    public void UpdateBoardState()
+    {
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+    }
+    public void UpdatePieceState(int square)
+    {
+        SetChildObjectsRendering(squares_root, square, ref_meshes_00, ref_mats_00);
+    }
+
+
     public void InitializeReferenceSets()
     {
         ref_meshes_00 = new Mesh[MESH_COUNT];
@@ -134,16 +154,6 @@ public class Chess4DBoard : MonoBehaviour
 
         ref_meshes_03 = new Mesh[MESH_COUNT];
         ref_mats_03 = new Material[MAT_COUNT];
-    }
-
-    // Piece setting methods.
-    // Set all piece meshes and materials based on supplied integer array reference
-    public void SetPiecesToState(int[] state)
-    {
-        squares = (int[])state.Clone();
-
-        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
-        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
     }
 
     public void FillReferenceSet(Mesh[] mesh_set, Material[] material_set, GameObject reference_root)
@@ -350,9 +360,10 @@ public class Chess4DBoard : MonoBehaviour
         // Initialize reference sets to be of size defined by global variables MESH_COUNT and MAT_COUNT.
         InitializeReferenceSets();
 
-        // Fill the reference set 00 based on the children of ReferencePieces. Lifts the first MESH_COUNT meshes from the children of
-        // ReferencePieces, then offsets by MAT_OFFSET to get the next MAT_COUNT materials from those same children, storing
-        // the results in ref_meshes_xx and ref_renderers_xx specified for later, faster access.
+        // Load the reference sets that store the meshes and materials used by the board for the pieces. Abstracted for
+        // easy overriding and customization.
+        LoadReferenceSets();
+        
         FillReferenceSet(ref_meshes_00, ref_mats_00, ReferencePieces);
 
         // Find the parent object of all square game objects
@@ -365,7 +376,7 @@ public class Chess4DBoard : MonoBehaviour
         InitializeSquares();
 
         // Set all the children of squares root to the correct mesh and material
-        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+        UpdateBoardState();
         
         // Update the pieces on the board to match the state stored in the board state array.
         //SetPiecesFromSquares();
@@ -901,7 +912,7 @@ public class Chess4DBoard : MonoBehaviour
         Array.Copy(start_state, 0, squares, 0, squares.Length);
 
         // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
-        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+        UpdateBoardState();
 
         // Clear the move history and buffer
         move_history = new int[0];
@@ -928,7 +939,7 @@ public class Chess4DBoard : MonoBehaviour
         InitializeSquares();
 
         // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
-        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+        UpdateBoardState();
 
         // clear the move history and buffer
         move_history = new int[0];
@@ -1095,10 +1106,9 @@ public class Chess4DBoard : MonoBehaviour
 
         // Update just the to and from squares to save on performance
 
-        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
-        SetChildObjectsRendering(squares_root, from, ref_meshes_00, ref_mats_00);
-        SetChildObjectsRendering(squares_root, to, ref_meshes_00, ref_mats_00);
-
+        // Update the changed pieces rendering states
+        UpdatePieceState(from);
+        UpdatePieceState(to);
 
         SetArrow(piece_arrow, from, to);
 
@@ -1130,19 +1140,12 @@ public class Chess4DBoard : MonoBehaviour
         squares[to] = captured;
 
         // update the to and from squares on the board
-        SetChildObjectsRendering(squares_root, from, ref_meshes_00, ref_mats_00);
-        SetChildObjectsRendering(squares_root, to, ref_meshes_00, ref_mats_00);
+        UpdatePieceState(from);
+        UpdatePieceState(to);
 
-        // If we are in the process of moving a piece
-        if (has_target)
-        {
-            // Set it to its final destination
-            GameObject old_target = squares_root.transform.GetChild(target_piece).gameObject;
-            old_target.transform.position = PosFromIndex(target_piece);
-        }
         // Target the new piece, that should be the piece that moved on this encoded move.
         target_piece = from;
-        has_target = true;
+        AddTarget(0, from, FetchGameobjectsChild(squares_root, from));
 
         // and move it to where its moving from (the move's "to coordinate"), so it can be auto moved in update.
         GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
@@ -2012,7 +2015,7 @@ public class Chess4DBoard : MonoBehaviour
         {
             TransposeInverse(test_state0_transposed, new_state, i);
         }
-        SetPiecesToState(new_state);
+        SetBoardState(new_state);
     }
 
 
