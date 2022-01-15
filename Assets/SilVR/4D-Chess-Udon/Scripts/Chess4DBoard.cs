@@ -123,7 +123,7 @@ public class Chess4DBoard : MonoBehaviour
 
     public void LoadReferenceSets()
     {
-        FillReferenceSet(ref_meshes_00, ref_mats_00, squares_root);
+        FillReferenceSet(ref_meshes_00, ref_mats_00, ReferencePieces);
     }
 
     public void SetBoardState(int[] state)
