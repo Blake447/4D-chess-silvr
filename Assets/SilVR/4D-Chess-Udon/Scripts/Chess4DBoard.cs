@@ -33,15 +33,32 @@ public class Chess4DBoard : MonoBehaviour
     int MESH_OFFSET = 0;
     int MESH_COUNT = 6;
 
-    int RENDERER_OFFSET = 6;
-    int RENDERER_COUNT = 2;
+    int MAT_OFFSET = 6;
+    int MAT_COUNT = 2;
 
     int NULL = 1024;
     int selected_square = 1024;
 
     public GameObject ReferencePieces;
-    public MeshFilter[] referenceMeshes;
-    public MeshRenderer[] referenceRenderers;
+    public GameObject ReferenceReflections;
+
+    public Mesh[] ref_meshes_00;
+    Mesh[] ref_meshes_01;
+    Mesh[] ref_meshes_02;
+    Mesh[] ref_meshes_03;
+    Mesh[] ref_meshes_04;
+    Mesh[] ref_meshes_05;
+    Mesh[] ref_meshes_06;
+    Mesh[] ref_meshes_07;
+
+    public Material[] ref_mats_00;
+    Material[] ref_mats_01;
+    Material[] ref_mats_02;
+    Material[] ref_mats_03;
+    Material[] ref_mats_04;
+    Material[] ref_mats_05;
+    Material[] ref_mats_06;
+    Material[] ref_mats_07;
 
     GameObject squares_root;
     int[] squares = new int[256];
@@ -95,6 +112,98 @@ public class Chess4DBoard : MonoBehaviour
     GameObject[] target_objects = new GameObject[8];
     Vector3[] target_vectors = new Vector3[8];
     bool[] target_flags = new bool[8];
+
+    public Material[] material_list = new Material[2];
+
+    ///////////////////////////////////////
+    ///                                 ///
+    ///      Setting Object Meshes      ///
+    ///                                 ///
+    ///////////////////////////////////////
+
+    public void InitializeReferenceSets()
+    {
+        ref_meshes_00 = new Mesh[MESH_COUNT];
+        ref_mats_00 = new Material[MAT_COUNT];
+
+        ref_meshes_01 = new Mesh[MESH_COUNT];
+        ref_mats_01 = new Material[MAT_COUNT];
+
+        ref_meshes_02 = new Mesh[MESH_COUNT];
+        ref_mats_02 = new Material[MAT_COUNT];
+
+        ref_meshes_03 = new Mesh[MESH_COUNT];
+        ref_mats_03 = new Material[MAT_COUNT];
+    }
+
+    // Piece setting methods.
+    // Set all piece meshes and materials based on supplied integer array reference
+    public void SetPiecesToState(int[] state)
+    {
+        squares = (int[])state.Clone();
+
+        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+    }
+
+    public void FillReferenceSet(Mesh[] mesh_set, Material[] material_set, GameObject reference_root)
+    {
+        //mesh_set = new Mesh[MESH_COUNT];
+        for (int i = 0; i < MESH_COUNT; i++)
+        {
+            mesh_set[i] = reference_root.transform.GetChild(i + MESH_OFFSET).gameObject.GetComponent<MeshFilter>().sharedMesh;
+        }
+        //material_set = new Material[RENDERER_COUNT];
+        for (int i = 0; i < MAT_COUNT; i++)
+        {
+            material_set[i] = reference_root.transform.GetChild(i + MAT_OFFSET).gameObject.GetComponent<MeshRenderer>().sharedMaterial;
+        }
+    }
+
+    // Get the material based on the supplied piece id. Ex. if we supply a white rook, (id = 10) we will get Material 0 for black
+    Material GetMaterialFromRefSet(Material[] material_set, int piece_id)
+    {
+        if (piece_id == 0) { return null; }
+        int color = ((piece_id - 1) / 6) & 1;
+        return material_set[color];
+    }
+    // Get the mesh based on the supplied piece id. Ex. if we supply a white rook, (colorless id = 5, full id = 10) we will get Mesh 4 for rook
+    Mesh GetMeshFromRefSet(Mesh[] mesh_set, int piece_id)
+    {
+        if (piece_id == 0) { return null; }
+        return mesh_set[((piece_id - 1) % 6)];
+    }
+
+    void SetAllChildrenRendering(GameObject root, Mesh[] mesh_set, Material[] material_set)
+    {
+        for (int i = 0; i < squares.Length; i++)
+        {
+            GameObject piece_object = root.transform.GetChild(i).gameObject;
+
+            // TODO: Factor this setting out since we dont always need to do this
+            piece_object.transform.position = PosFromIndex(i);
+
+            MeshFilter mesh_filter = piece_object.GetComponent<MeshFilter>();
+            MeshRenderer mesh_renderer = piece_object.GetComponent<MeshRenderer>();
+
+            mesh_filter.sharedMesh = GetMeshFromRefSet(mesh_set, squares[i]);
+            mesh_renderer.sharedMaterial = GetMaterialFromRefSet(material_set, squares[i]);
+        }
+    }
+
+    void SetChildObjectsRendering(GameObject root, int square, Mesh[] mesh_set, Material[] material_set)
+    {
+        GameObject piece_object = root.transform.GetChild(square).gameObject;
+
+        // TODO: Factor this setting out since we dont always need to do this
+        piece_object.transform.position = PosFromIndex(square);
+
+        MeshFilter mesh_filter = piece_object.GetComponent<MeshFilter>();
+        MeshRenderer mesh_renderer = piece_object.GetComponent<MeshRenderer>();
+
+        mesh_filter.sharedMesh = GetMeshFromRefSet(mesh_set, squares[square]);
+        mesh_renderer.sharedMaterial = GetMaterialFromRefSet(material_set, squares[square]);
+    }
 
     ///////////////////////////////////////
     ///                                 ///
@@ -238,11 +347,13 @@ public class Chess4DBoard : MonoBehaviour
 
     public void InitializeBoard()
     {
-        // Get some reference meshes that we use to set the piece meshes programatically
-        FillReferenceMeshes(ReferencePieces, MESH_OFFSET, MESH_COUNT);
+        // Initialize reference sets to be of size defined by global variables MESH_COUNT and MAT_COUNT.
+        InitializeReferenceSets();
 
-        // get some reference renderers we use to set the piece materials programatically
-        FillReferenceRenderers(ReferencePieces, RENDERER_OFFSET, RENDERER_COUNT);
+        // Fill the reference set 00 based on the children of ReferencePieces. Lifts the first MESH_COUNT meshes from the children of
+        // ReferencePieces, then offsets by MAT_OFFSET to get the next MAT_COUNT materials from those same children, storing
+        // the results in ref_meshes_xx and ref_renderers_xx specified for later, faster access.
+        FillReferenceSet(ref_meshes_00, ref_mats_00, ReferencePieces);
 
         // Find the parent object of all square game objects
         FindAndSetSquaresRoot();
@@ -253,33 +364,13 @@ public class Chess4DBoard : MonoBehaviour
         // Initialize the squares array that keeps track of the board state
         InitializeSquares();
 
+        // Set all the children of squares root to the correct mesh and material
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
+        
         // Update the pieces on the board to match the state stored in the board state array.
-        SetPiecesFromSquares();
+        //SetPiecesFromSquares();
 
     }
-
-
-    // Set up the reference meshes for setting piece meshes on the fly
-    void FillReferenceMeshes(GameObject ReferenceRoot, int start, int length)
-    {
-        referenceMeshes = new MeshFilter[length];
-        for (int i = 0; i < length; i++)
-        {
-            referenceMeshes[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshFilter>();
-        }
-    }
-
-
-    // Set up reference renderers for setting up piece materials on the fly
-    void FillReferenceRenderers(GameObject ReferenceRoot, int start, int length)
-    {
-        referenceRenderers = new MeshRenderer[length];
-        for (int i = 0; i < length; i++)
-        {
-            referenceRenderers[i] = ReferenceRoot.transform.GetChild(start + i).GetComponent<MeshRenderer>();
-        }
-    }
-
 
     // Locate and save the reference of the parent child of all square objects.
     void FindAndSetSquaresRoot()
@@ -809,8 +900,8 @@ public class Chess4DBoard : MonoBehaviour
         // Copy the starting state into the squares array
         Array.Copy(start_state, 0, squares, 0, squares.Length);
 
-        // Set pieces from the squares array
-        SetPiecesFromSquares();
+        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
 
         // Clear the move history and buffer
         move_history = new int[0];
@@ -835,7 +926,9 @@ public class Chess4DBoard : MonoBehaviour
     {
         // Reset the board to its starting state
         InitializeSquares();
-        SetPiecesFromSquares();
+
+        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
+        SetAllChildrenRendering(squares_root, ref_meshes_00, ref_mats_00);
 
         // clear the move history and buffer
         move_history = new int[0];
@@ -1001,8 +1094,11 @@ public class Chess4DBoard : MonoBehaviour
         WriteHistory(from, to, captured, isPromoting);
 
         // Update just the to and from squares to save on performance
-        SetPieceFromSquares(from);
-        SetPieceFromSquares(to);
+
+        // Set pieces from the squares array, grabbing references from ref_mesh array 0 and ref_mats array 0
+        SetChildObjectsRendering(squares_root, from, ref_meshes_00, ref_mats_00);
+        SetChildObjectsRendering(squares_root, to, ref_meshes_00, ref_mats_00);
+
 
         SetArrow(piece_arrow, from, to);
 
@@ -1034,8 +1130,8 @@ public class Chess4DBoard : MonoBehaviour
         squares[to] = captured;
 
         // update the to and from squares on the board
-        SetPieceFromSquares(from);
-        SetPieceFromSquares(to);
+        SetChildObjectsRendering(squares_root, from, ref_meshes_00, ref_mats_00);
+        SetChildObjectsRendering(squares_root, to, ref_meshes_00, ref_mats_00);
 
         // If we are in the process of moving a piece
         if (has_target)
@@ -1104,65 +1200,6 @@ public class Chess4DBoard : MonoBehaviour
             square_instance.name = "Square" + (i / 100 % 10).ToString() + (i / 10 % 10).ToString() + (i % 10).ToString();
         }
     }
-
-
-    // Piece setting methods.
-    // Set all piece meshes and materials based on supplied integer array reference
-    public void SetPiecesToState(int[] state)
-    {
-        squares = (int[])state.Clone();
-        SetPiecesFromSquares();
-    }
-
-
-    // Set specified piece from the current squares state
-    void SetPieceFromSquares(int square_index)
-    {
-        GameObject square = squares_root.transform.GetChild(square_index).gameObject;
-        square.transform.position = PosFromIndex(square_index);
-
-        MeshFilter mesh_filter = square.GetComponent<MeshFilter>();
-        MeshRenderer mesh_renderer = square.GetComponent<MeshRenderer>();
-
-        mesh_filter.sharedMesh = GetMesh(squares[square_index]);
-        mesh_renderer.sharedMaterial = GetMaterial(squares[square_index]);
-    }
-
-
-    // Set all pieces from the current squares state
-    void SetPiecesFromSquares()
-    {
-        for (int i = 0; i < squares.Length; i++)
-        {
-            GameObject square = squares_root.transform.GetChild(i).gameObject;
-            square.transform.position = PosFromIndex(i);
-
-            MeshFilter mesh_filter = square.GetComponent<MeshFilter>();
-            MeshRenderer mesh_renderer = square.GetComponent<MeshRenderer>();
-
-            mesh_filter.sharedMesh = GetMesh(squares[i]);
-            mesh_renderer.sharedMaterial = GetMaterial(squares[i]);
-        }
-    }
-
-
-    // Get the material based on the supplied piece id. Ex. if we supply a white rook, (id = 10) we will get Material 0 for black
-    Material GetMaterial(int piece_id)
-    {
-        if (piece_id == 0) { return null; }
-        return referenceRenderers[((piece_id - 1) / 6) & 1].sharedMaterial;
-    }
-
-
-    // Get the mesh based on the supplied piece id. Ex. if we supply a white rook, (colorless id = 5, full id = 10) we will get Mesh 4 for rook
-    Mesh GetMesh(int piece_id)
-    {
-        if (piece_id == 0) { return null; }
-        return referenceMeshes[((piece_id - 1) % 6)].mesh;
-    }
-
-
-
 
 
     ///////////////////////////////////////
