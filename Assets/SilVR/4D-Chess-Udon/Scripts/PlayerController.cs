@@ -72,7 +72,7 @@ public class PlayerController : UdonSharpBehaviour
                 Vector3 fing_pos = player.GetBonePosition(HumanBodyBones.RightIndexProximal);
                 offset = fing_pos - hand_pos;
 
-                zCast_left.transform.localPosition = target_pos_left;
+                zCast_left.transform.position = target_pos_left;
                 zCast_left.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
                 //SnapCursor();
                 if (!SnapCursor(zCast_left))
@@ -82,7 +82,7 @@ public class PlayerController : UdonSharpBehaviour
                 zCast_left.transform.position += new Vector3(0.0f, 0.0325f, 0.0f);
 
 
-                zCast_right.transform.localPosition = target_pos_right;
+                zCast_right.transform.position = target_pos_right;
                 zCast_right.transform.position -= new Vector3(0.0f, 0.0325f, 0.0f);
                 //SnapCursor();
                 if (!SnapCursor(zCast_right))
