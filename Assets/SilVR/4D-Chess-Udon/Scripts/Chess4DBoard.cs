@@ -220,6 +220,26 @@ public class Chess4DBoard : MonoBehaviour
     ///        Animating Pieces         ///
     ///                                 ///
     ///////////////////////////////////////
+    public void SetPiecePosition(int from, int to)
+    {
+        Vector3 pos = PosFromIndex(to);
+        GameObject piece = FetchGameobjectsChild(squares_root, from);
+        piece.transform.position = pos;
+
+    }
+    public void UpdateAssignedTargetsIfNotNull(float speed)
+    {
+        int PIECE_TARGET_INDEX = 0;
+        UpdateTargetIfNotNull(PIECE_TARGET_INDEX, speed);
+    }
+
+    public void AddTargets(int square)
+    {
+        GameObject piece = FetchGameobjectsChild(squares_root, square);
+        int PIECE_TARGET_INDEX = 0;
+        AddTarget(PIECE_TARGET_INDEX, square, piece);
+
+    }
 
     GameObject FetchGameobjectsChild(GameObject root, int square)
     {
@@ -486,9 +506,10 @@ public class Chess4DBoard : MonoBehaviour
             }
         }
 
-        // Move the target piece towards its target position, if its not null.
+        // Move the target pieces towards its target position, if its not null.
         // 0 specifices the first target, and move speed sets how far to move the piece per frame.
-        UpdateTargetIfNotNull(0, move_speed * Time.deltaTime);
+        // Abstracted for easy overriding
+        UpdateAssignedTargetsIfNotNull(move_speed * Time.deltaTime);
 
         // Set the turn indicator to show whos turn it is to play.
         // TODO: Get this out of update function
@@ -1112,15 +1133,18 @@ public class Chess4DBoard : MonoBehaviour
 
         SetArrow(piece_arrow, from, to);
 
-        // Set our new target piece
         target_piece = to;
-        AddTarget(0, to, FetchGameobjectsChild(squares_root, to));
+        AddTargets(to);
+        SetPiecePosition(to, from);
+
+        // Set our new target piece
+        //AddTarget(0, to, FetchGameobjectsChild(squares_root, to));
 
         // Grab the square gameobject of the piece we need to grab
-        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
+        //GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
 
         // and move it to where it is moving from, so we can automatically move it towards its new position
-        square.transform.position = PosFromIndex(from);
+        //square.transform.position = PosFromIndex(from);
     }
 
 
@@ -1145,11 +1169,12 @@ public class Chess4DBoard : MonoBehaviour
 
         // Target the new piece, that should be the piece that moved on this encoded move.
         target_piece = from;
-        AddTarget(0, from, FetchGameobjectsChild(squares_root, from));
-
+        AddTargets(from);
+        //AddTarget(0, from, FetchGameobjectsChild(squares_root, from));
+        SetPiecePosition(from, to);
         // and move it to where its moving from (the move's "to coordinate"), so it can be auto moved in update.
-        GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
-        square.transform.position = PosFromIndex(to);
+        //GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
+        //square.transform.position = PosFromIndex(to);
     }
 
 
