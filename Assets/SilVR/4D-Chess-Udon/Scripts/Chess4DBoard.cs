@@ -19,6 +19,7 @@ public class Chess4DBoard : MonoBehaviour
     public GameObject SquareTemplate;
     public TVBotRig tv_bot;
     public GameObject piece_arrow;
+    public GameObject check_arrows_root;
     public GameObject turn_indicator_white;
     public GameObject turn_indicator_black;
 
@@ -114,6 +115,18 @@ public class Chess4DBoard : MonoBehaviour
     bool[] target_flags = new bool[8];
 
     public Material[] material_list = new Material[2];
+
+    int[] checking_piece_buffer = new int[256];
+    int checking_piece_count = 0;
+
+    int white_king_index = 0;
+    int black_king_index = 0;
+
+    int[] checking_white = new int[256];
+    int[] checking_black = new int[256];
+
+    int checking_white_count = 0;
+    int checking_black_count = 0;
 
     ///////////////////////////////////////
     ///                                 ///
@@ -289,6 +302,64 @@ public class Chess4DBoard : MonoBehaviour
     ///         Gizmo Control           ///
     ///                                 ///
     ///////////////////////////////////////
+
+    public void SetAllCheckArrows()
+    {
+        CheckForCheck();
+
+        ClearCheckArrows();
+
+        int white_count = checking_white_count;
+        int black_count = checking_black_count;
+        int white_king = GetKingIndex(1);
+        int black_king = GetKingIndex(0);
+        int arrow_count = GetCheckArrowCount();
+
+        int white_iterations = Mathf.Min(arrow_count, white_count);
+        int black_iterations = Mathf.Min(arrow_count - white_count, black_count);
+
+        for (int i = 0; i < white_iterations; i++)
+        {
+            SetCheckArrow(i, checking_white[i], white_king);
+        }
+        for (int i = 0; i < black_iterations; i++)
+        {
+            SetCheckArrow(white_count + i, checking_black[i], black_king);
+        }
+    }
+
+    public void SetCheckArrow(int index, int from, int to)
+    {
+        if (index < GetCheckArrowCount())
+        {
+            GameObject arrow = GetCheckArrow(index);
+            arrow.SetActive(true);
+            SetArrow(arrow, from, to);
+        }
+    }
+
+    public int GetCheckArrowCount()
+    {
+        return check_arrows_root.transform.childCount;
+    }
+
+    public GameObject GetCheckArrow(int index)
+    {
+        if (index < check_arrows_root.transform.childCount)
+        {
+            return check_arrows_root.transform.GetChild(index).gameObject;
+        }
+        return null;
+    }
+
+    public void ClearCheckArrows()
+    {
+        for (int i = 0; i < GetCheckArrowCount(); i++)
+        {
+            GameObject arrow = GetCheckArrow(i);
+            arrow.SetActive(false);
+        }
+    }
 
     public void SetTurnIndicator()
     {
@@ -527,12 +598,26 @@ public class Chess4DBoard : MonoBehaviour
     ///////////////////////////////////////
 
     // TODO: Implement a check search
-    public void CheckForCheck(int square, int color)
+    public void CheckForCheck()
     {
+        Debug.Log("Searching King of color 1: white");
+        Debug.Log("");
+        int WHITE = 1;
+        int white_square = GetKingIndex(WHITE);
+        if (white_square != NULL)
+        {
+            Debug.Log("Is King of color " + WHITE + " in check: (not implemented) " + IsSquareInCheck(white_square, WHITE));
+        }
 
+        Debug.Log("Searching King of color 0: black");
+        Debug.Log("");
 
-
-
+        int BLACK = 0;
+        int black_square = GetKingIndex(BLACK);
+        if (black_square != NULL)
+        {
+            Debug.Log("Is King of color " + BLACK + " in check: (not implemented) " + IsSquareInCheck(black_square, BLACK));
+        }
     }
 
 
@@ -678,6 +763,7 @@ public class Chess4DBoard : MonoBehaviour
         int color_from = PieceColor(piece_id_from);
         int color_to = PieceColor(piece_id_to);
 
+
         // terminate early if the color of piece we are moving is not the color of the piece that needs to move this turn
         bool isPlayersTurn = color_from == DetermineTurnFromHistory();
         if (!isPlayersTurn) { return false; }
@@ -693,6 +779,34 @@ public class Chess4DBoard : MonoBehaviour
 
         // if we are attempting to move to an invalid target (not empty, same color), terminate early
         if (!isTargetValid) { return false; }
+
+        // After all other checks are done, see if the piece actually moves as specified
+        return IsInPieceMoveSet(from, to);
+
+    }
+    public bool IsInPieceMoveSet(int from, int to)
+    {
+
+        // This is a lot of recalculating whats in the above method, but we'll only double up on the calculations
+        // when the player phsyically moves a single pawn at the moment, since otherwise this method will be called
+        // alone for evaluation purposes.
+
+        // Get the pieces on the to and from square
+        int piece_id_from = squares[from];
+        int piece_id_to = squares[to];
+
+
+        int piece_type = PieceTypeColorless(piece_id_from);
+
+        // get the color of the moving piece, and the piece at the square it lands on.
+        int color_from = PieceColor(piece_id_from);
+        int color_to = PieceColor(piece_id_to);
+
+        // determine if we are moving to an empty square
+        bool isToEmpty = piece_id_to == 0;
+
+        // if we are not moving to an empty square, determine if we are moving to a piece of a different color
+        bool isDifferentColor = color_from != color_to && !isToEmpty;
 
         // unpack the to and from coordinates into integers ranging from 0-3.
         int xf = (from >> 0) & 3;
@@ -856,8 +970,8 @@ public class Chess4DBoard : MonoBehaviour
 
         // If all else fails for some reason, allow the move as long as its actually moving a piece
         return from != to;
-    }
 
+    }
 
 
 
@@ -1145,6 +1259,9 @@ public class Chess4DBoard : MonoBehaviour
 
         // and move it to where it is moving from, so we can automatically move it towards its new position
         //square.transform.position = PosFromIndex(from);
+
+        // TODO: Optimize
+        SetAllCheckArrows();
     }
 
 
@@ -1175,6 +1292,10 @@ public class Chess4DBoard : MonoBehaviour
         // and move it to where its moving from (the move's "to coordinate"), so it can be auto moved in update.
         //GameObject square = squares_root.transform.GetChild(target_piece).gameObject;
         //square.transform.position = PosFromIndex(to);
+
+
+        // TODO: Optimize
+        SetAllCheckArrows();
     }
 
 
@@ -2336,19 +2457,124 @@ public class Chess4DBoard : MonoBehaviour
     public int[] board_buffer0 = new int[256];
     int bbCount0 = 0;
 
+    int GetKingIndex(int color)
+    {
+        int piece_type = 1 + 6 * color;
+
+        for (int i = 0; i < squares.Length; i++)
+        {
+            if (squares[i] == piece_type)
+            {
+                return i;
+            }
+        }
+        return NULL;
+    }
+
     public void SendCheckRequestWhite()
     {
         SendCheckRequest(CheckRequestCursor.transform.position, 1);
     }
 
+    public bool IsSquareInCheck(int index, int color)
+    {
+        ClearChecking(color);
+
+        // Copy current board state to buffer board state
+        Array.Copy(squares, 0, board_buffer0, 0, squares.Length);
+
+        // Clear our move buffer as prep
+        ClearMoveBuffer();
+
+        // replace our piece on the buffer with a queen
+        board_buffer0[index] = 2 + 6 * color;
+
+        // Fill the move buffer (without clearing) with our queens moves
+        FillMoveBuffer(board_buffer0, index);
+
+        // replace our piece with a knight
+        board_buffer0[index] = 4 + 6 * color;
+
+        // Append knight moves to the move buffer (without clearing)
+        FillMoveBuffer(board_buffer0, index);
+
+        // The move buffer should now contain all possible squares that move from the king, to a full queens and knights movesets.
+        // Note that if we can capture a square as a queen, a queen on that square could capture the king. Checking a queens moves
+        // from OUR position + knights covers all possible squares we can be directly in check from. (Note that fill move buffer
+        // handles piece occlusion internally).
+
+        // Record a check flag for if we are checked in the search
+        bool isInCheck = false;
+
+        // for each move in the move buffer (move_count is global)
+        for (int i = 0; i < move_count; i++)
+        {
+            // Decode the relavent information of squares from, to, and captured piece
+            int from = decode_from(move_array[i]);
+            int to = decode_to(move_array[i]);
+            int captured = decode_captured(move_array[i]);
+
+            // If we find a piece in the square we could move to
+            if (captured != 0)
+            {
+                // Determine if that piece can capture us, independently of how the square was generated for the search
+                bool canPieceCapture = IsInPieceMoveSet(to, from);
+                if (canPieceCapture)
+                {
+                    AddToChecking(to, color);
+                }
+
+
+                // extract coordinates for debug info
+                int x = (to >> 0) & 3;
+                int y = (to >> 2) & 3;
+                int z = (to >> 4) & 3;
+                int w = (to >> 6) & 3;
+
+                // debug our search step
+                Debug.Log("Found piece of type " + decode_captured(move_array[i]) + " at coord (" + x + ", " + y + ", " + z + ", " + w + "). Is threatening ? : " + canPieceCapture);
+
+                // update our check flag accordingly
+                isInCheck = isInCheck || canPieceCapture;
+
+            }
+        }
+
+        // return our final result
+        return isInCheck;
+    }
+
+    public void AddToChecking(int index, int color)
+    {
+        if (color == 0)
+        {
+            checking_black[checking_black_count] = index;
+            checking_black_count++;
+        }
+        if (color == 1)
+        {
+            checking_white[checking_white_count] = index;
+            checking_white_count++;
+        }
+    }
+
+    public void ClearChecking(int color)
+    {
+        if (color == 0)
+        {
+            checking_black_count = 0;
+        }
+        if (color == 1)
+        {
+            checking_white_count = 0;
+        }
+    }
 
     public void SendCheckRequest(Vector3 position, int color)
     {
         Vector4 coord = SnapToCoordinateVerbose(position);
         bool isValidCoord = !IsVectorOutOfBounds(coord);
-        LoadBoardBuffer(VectorToIndex(coord), color);
-        Debug.Log("Board buffer has been filled");
-        PrintMoveArray();
+        bool isInCheck = IsSquareInCheck(VectorToIndex(coord), color);
     }
 
    
@@ -2398,16 +2624,24 @@ public class Chess4DBoard : MonoBehaviour
     private void ClearMoveBuffer()
     {
         move_count = 0;
+        move_array[0] = NULL;
+    }
+
+    public void AddToCheckPieceBuffer(int square)
+    {
+        if (checking_piece_count < 256)
+        {
+            checking_piece_buffer[checking_piece_count] = square;
+            checking_piece_count++;
+        }
+    }
+    public void ClearCheckPieceBuffer()
+    {
+        checking_piece_count = 0;
     }
 
     private void FillMoveBuffer(int[] state, int square)
     {
-        //pieces_count = 0;
-
-        move_count = 0;
-        move_array[0] = NULL;
-
-
         int piece = state[square];
         int piece_type = PieceTypeColorless(piece);
         int piece_color = PieceColor(piece);
@@ -2673,12 +2907,6 @@ public class Chess4DBoard : MonoBehaviour
     }
 
 
-    public void LoadBoardBuffer(int local_square, int color)
-    {
-        Array.Copy(squares, 0, board_buffer0, 0, squares.Length);
-        board_buffer0[local_square] = 2 + 6 * color;
-        FillMoveBuffer(board_buffer0, local_square);
-    }
 
 
 
